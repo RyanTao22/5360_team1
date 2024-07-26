@@ -19,6 +19,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
+print("hello world")
 def back_test(self, start_date, end_date):
     trading_dates_list = pd.read_csv('trading_dates.csv')
     start_date_dt = datetime.strptime(start_date, '%Y%m%d')
