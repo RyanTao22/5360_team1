@@ -2,6 +2,7 @@
 processedData_2024/stocks/
 processedData_2024/futuresQuotes/
 processedData_2024/futuresTrades/
+testdata.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

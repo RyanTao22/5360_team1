@@ -481,6 +481,7 @@ class InDevelopingStrategy(QuantStrategy):
                 self.pnl.append(self.pnl[-1] - tradesize * direction * tradeprice)
                 self.cash.append(self.cash[-1] - tradesize * direction * tradeprice)
                 '''price1 和 price2 应该取最新的成交价，具体那个字段我目前不太清楚'''
+                
                 self.networth.append(self.position[self.tickers[0]][-1] * price1 + self.position[self.tickers[1]][
                     -1] * price2 + self.cash[-1])
 
