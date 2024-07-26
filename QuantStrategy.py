@@ -82,7 +82,9 @@ class SampleDummyStrategy(QuantStrategy):
             ticker1RecentMarketData = None
             ticker2RecentMarketData = None
 
+
             if len(ticker1MarketData) > 0:
+                
                 ticker1RecentMarketData = ticker1MarketData[-1]
                 '''更新价格1'''
                 self.midPrices[ticker1].append((ticker1RecentMarketData['bidPrice1'] + ticker1RecentMarketData['askPrice1'])/2)
@@ -129,7 +131,7 @@ class SampleDummyStrategy(QuantStrategy):
                 from datetime import datetime
                 now = datetime.now()
                 sampleOrder1 = SingleStockOrder(
-                    ticker="2610",
+                    ticker=ticker1,
                     date=now.date(),
                     submissionTime=now.time()
                 )
@@ -142,7 +144,7 @@ class SampleDummyStrategy(QuantStrategy):
                 sampleOrder1.stratID = self.getStratID()
 
                 sampleOrder2 = SingleStockOrder(
-                    ticker="3374",
+                    ticker=ticker2,
                     date=now.date(),
                     submissionTime=now.time()
                 )

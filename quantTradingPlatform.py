@@ -42,6 +42,9 @@ class TradingPlatform:
         self.orderManager = OrderManager(debug=debug)
         self.tickers2Snapshots: Mapping[str,list[pd.DataFrame]] = defaultdict(lambda: [])
 
+        self.stockCodes = stockCodes
+        self.futuresCodes = futuresCodes
+
         
 
         ######init strat
@@ -65,7 +68,7 @@ class TradingPlatform:
             elif isinstance(strat.ticker,str):
                 self.tickers2Strats[strat.ticker] += [strat]
 
-        t_md = threading.Thread(name='platform.on_marketData', target=self.consume_marketData, args=( marketData_2_platform_q,))
+        t_md = threading.Thread(name='platform.on_marketData', target=self.consume_marketData, args=( marketData_2_platform_q,analysis_q,))
         t_md.start()
         
         t_exec = threading.Thread(name='platform.on_exec', target=self.handle_execution, args=(exchSim_2_platform_execution_q, ))
@@ -77,13 +80,23 @@ class TradingPlatform:
             print("sleep for 3 secs")
             time.sleep(3)
 
-    def consume_marketData(self, marketData_2_platform_q):
+    def consume_marketData(self, marketData_2_platform_q,analysis_q):
         print('[%d]Platform.consume_marketData' % (os.getpid(),))
         self.loopUntilReady()
+        
+    
+
         while True:
+            
             res:OrderBookSnapshot_FiveLevels = marketData_2_platform_q.get()
+            
+            '''判断数据是否都更新完成'''
+            if res.ticker.endswith('_EndOfData'): 
+                analysis_q.put({'signal':'EndOfData'})
+                print('signal EndOfData----------------------------------------------------------------------------------------------------')
+
             print('[%d] Platform.on_md' % (os.getpid()))
-            #$print(res.outputAsDataFrame())
+            #print(res.outputAsDataFrame())
 
             ######updating tickers2Snapshots
             self.tickers2Snapshots[res.ticker].append(res.outputAsDataFrame())
@@ -98,6 +111,7 @@ class TradingPlatform:
                     if order.type == "CANCEL":
                         order.currStatus = "Cancelled"
                     self.orderManager.trackOrder(order)
+                    print(f'Order {order.ticker} has been sent to the exchange')
                     self.qMapping.get(order.ticker).put(order)
             if self.debug: self.orderManager.displayOrders()
     

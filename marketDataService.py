@@ -162,13 +162,13 @@ class MarketDataService:
             marketData_2_exchSim_q.put(quoteSnapshot)
             marketData_2_platform_q.put(quoteSnapshot)
         '''添加一个EndOfData的信号'''
-        # quoteEndOfData = OrderBookSnapshot_FiveLevels('EndOfData', now.date(), now.time(),
-        #                                               bidPrice=[0, 0, 0, 0, 0],
-        #                                               askPrice=[0, 0, 0, 0, 0],
-        #                                               bidSize=[0, 0, 0, 0, 0],
-        #                                               askSize=[0, 0, 0, 0, 0])
-        # marketData_2_platform_q.put(quoteEndOfData)
-            # print(quoteSnapshot.outputAsDataFrame())
+        quoteEndOfData = OrderBookSnapshot_FiveLevels(row.ticker+'_EndOfData', now.date(), now.time(),
+                                                      bidPrice=[0, 0, 0, 0, 0],
+                                                      askPrice=[0, 0, 0, 0, 0],
+                                                      bidSize=[0, 0, 0, 0, 0],
+                                                      askSize=[0, 0, 0, 0, 0])
+        marketData_2_platform_q.put(quoteEndOfData)
+        # print(quoteSnapshot.outputAsDataFrame())
 
 
 # bidPrice, askPrice, bidSize, askSize = [], [], [], []

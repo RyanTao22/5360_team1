@@ -13,6 +13,7 @@ from exchangeSimulator import ExchangeSimulator
 from quantTradingPlatform import TradingPlatform
 import os
 import pandas as pd
+import time
 
 # Explicitly set the start method to 'spawn'
 #set_start_method('spawn', force=True)
@@ -66,6 +67,7 @@ def calculate_indicators(net_worth_list, baseline_networth, initial_cash, timest
     }
     return results
 
+
 def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest):
     marketData_2_exchSim_q = Queue()
     marketData_2_platform_q = Queue()
@@ -83,37 +85,46 @@ def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSp
     platform_2_strategy_execution_q = Queue()
 
     analysis_q = Queue()
-    isReady = None#Value('i',0)
+    isReady = None
 
+    processes = []
+
+    # try:
     if futuresCodes == []:
-        Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime,stockCodes,playSpeed,backTest,isReady, )).start()
-        Process(name='stockExchange', target=ExchangeSimulator,  args=(marketData_2_exchSim_q, platform_2_exchSim_order_q,       exchSim_2_platform_execution_q,stockCodes,  isReady,debug,)).start()
+        processes.append(Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, isReady)))
+        processes.append(Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)))
     elif stockCodes == []:
-        Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, futureData_2_platform_q, startDate, endDate, startTime,futuresCodes,playSpeed, backTest,isReady,)).start()
-        Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q,exchSim_2_platform_execution_q,futuresCodes,isReady,debug,)).start()
+        processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, futureData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
+        processes.append(Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)))
     else:
-        Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime,stockCodes,playSpeed,backTest,isReady, )).start()
-        Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, futureData_2_platform_q, startDate, endDate, startTime,futuresCodes,playSpeed, backTest,isReady,)).start()
-        Process(name='stockExchange', target=ExchangeSimulator,  args=(marketData_2_exchSim_q, platform_2_exchSim_order_q,       exchSim_2_platform_execution_q,stockCodes,  isReady,debug,)).start()
-        Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q,exchSim_2_platform_execution_q,futuresCodes,isReady,debug,)).start()
-    
-                                                                   
+        processes.append(Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, isReady)))
+        processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, futureData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
+        processes.append(Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)))
+        processes.append(Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)))
 
-    #Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, stockCodes, futuresCodes, initial_cash, isReady,True,)).start()
-    Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, stockCodes, futuresCodes, initial_cash, analysis_q, isReady, debug,)).start()       
+    processes.append(Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, stockCodes, futuresCodes, initial_cash, analysis_q, isReady, debug)))
+    
+    for p in processes:
+        p.start()
+        #time.sleep(1)  # Ensure processes start in sequence to avoid race conditions
 
     net_worth_list = []
     timestamps = []
     baseline_networth = []
 
     while True:
-        try:
-            data = analysis_q.get(timeout=20)  # Adjust timeout as necessary
-            net_worth_list.append(data['networth'])
-            timestamps.append(data['timestamp'])
-            baseline_networth.append(data['baseline_networth'])
-        except:
+        data = analysis_q.get()
+        if 'signal' in data and data['signal'] == 'EndOfData':
             break
+        net_worth_list.append(data['networth'])
+        timestamps.append(data['timestamp'])
+        #baseline_networth.append(data['baseline_networth'])
+        baseline_networth.append(initial_cash)
+        baseline_networth[-1] = baseline_networth[-1] * (1 + 0.0001 * random.randint(-10, 10))
+    # finally:
+    #     for p in processes:
+    #         print(p.name,'terminate')
+    #         p.terminate()
 
     return net_worth_list, timestamps, baseline_networth
 
@@ -126,6 +137,9 @@ def back_test_analysis():
             dcc.Input(id='start_date', value='20240628', type='text', style={'margin-bottom': '10px'}),
             html.Label('End Date', style={'font-weight': 'bold'}),
             dcc.Input(id='end_date', value='20240628', type='text', style={'margin-bottom': '10px'}),
+            html.Label('Start Time', style={'font-weight': 'bold'}),
+            # should be int
+            dcc.Input(id='start_time', value=132315869, type='number', style={'margin-bottom': '10px'}),
             html.Label('Initial Cash', style={'font-weight': 'bold'}),
             dcc.Input(id='initial_cash', value=1000000, type='number', style={'margin-bottom': '10px'}),
             html.Label('Play Speed', style={'font-weight': 'bold'}),
@@ -134,19 +148,21 @@ def back_test_analysis():
             dcc.Input(id='ticker1', value='2610', type='text', style={'margin-bottom': '10px'}),
             html.Label('ticker2', style={'font-weight': 'bold'}),
             dcc.Input(id='ticker2', value='3374', type='text', style={'margin-bottom': '10px'}),
-
-            # dcc.Checklist('Back Test', id='back_test', value=True, style={'margin-bottom': '10px'}),
-            dcc.RadioItems(
-                id='back_test',
-                options=[
-                    {'label': 'Yes', 'value': True}, 
-                    {'label': 'No', 'value': False},
-                ],
-                value=True,
-                style={'margin-bottom': '10px'},
-                inline=True
-            ),
             html.Button('Run Backtest', id='run_backtest', n_clicks=0, style={'background-color': '#4CAF50', 'color': 'white', 'padding': '10px', 'border': 'none', 'cursor': 'pointer', 'font-weight': 'bold', 'float': 'right'}),
+
+            # todo: BackTest按钮
+            # dcc.Checklist('Back Test', id='back_test', value=True, style={'margin-bottom': '10px'}),
+            # dcc.RadioItems(
+            #     id='back_test',
+            #     options=[
+            #         {'label': 'Yes', 'value': True}, 
+            #         {'label': 'No', 'value': False},
+            #     ],
+            #     value=True,
+            #     style={'margin-bottom': '10px'},
+            #     inline=True
+            # ),
+            
         ], style={'margin-bottom': '20px', 'background-color': '#f2f2f2'}),
         html.Div([
             html.Table([
@@ -215,7 +231,7 @@ def back_test_analysis():
             Output('strategy_volatility', 'children'),
             Output('benchmark_volatility', 'children'),
             Output('max_drawdown_period', 'children'),
-            Output('networth_graph', 'figure')
+            Output('networth_graph', 'figure'),
         ],
         [
             Input('run_backtest', 'n_clicks'),
@@ -223,14 +239,14 @@ def back_test_analysis():
         [
             State('start_date', 'value'),
             State('end_date', 'value'),
+            State('start_time', 'value'),
             State('initial_cash', 'value'),
             State('play_speed', 'value'),
             State('ticker1', 'value'),
             State('ticker2', 'value'),
-            State('back_test', 'value')
         ]
     )
-    def update_backtest(n_clicks, start_date, end_date, initial_cash, play_speed,ticker1,ticker2,back_test):
+    def update_backtest(n_clicks, start_date,  end_date, start_time, initial_cash, play_speed,ticker1,ticker2):
         if n_clicks == 0:
             return ['--']*16 + [{}]
 
@@ -247,17 +263,22 @@ def back_test_analysis():
         if ticker2 in stock_codes_full: stockCodes.append(ticker2)
         else: futuresCodes.append(ticker2)
 
-        '''可根据需求改小'''
-        start_time = 131515869
-        #play_speed = 1000
+        '''此处设置为很大，以缩短使得到结果。可根据需求改小'''
+        # start_time = 132315869
+        # play_speed = 1000
         debug = False
+        backTest = True
         
 
-        net_worth_list, timestamps, baseline_networth = run_backtest(start_date, end_date, start_time, stockCodes, futuresCodes, play_speed, initial_cash, debug, back_test)
+        net_worth_list, timestamps, baseline_networth = run_backtest(start_date, end_date, start_time, stockCodes, futuresCodes, play_speed, initial_cash, debug, backTest)
         
-        pd.DataFrame({'timestamp':timestamps,'net_worth':net_worth_list}).to_csv('net_worth.csv',index=False)
+        #pd.DataFrame({'timestamp':timestamps,'net_worth':net_worth_list}).to_csv('net_worth.csv',index=False)
         print(net_worth_list)
         print(baseline_networth)
+
+        '''调整由Queue得到的数据格式，以便于计算'''
+        timestamps = [ts[0] for ts in timestamps]
+        net_worth_list = [nw[0] for nw in net_worth_list]
 
         results = calculate_indicators(net_worth_list, baseline_networth, initial_cash, timestamps,n_loops_a_day = int(len(timestamps) / len(set([t.date() for t in timestamps]))))
         
@@ -276,7 +297,7 @@ def back_test_analysis():
         adjusted_timestamps = []
         adjusted_net_worth_list = []
         for ts, nw in zip(timestamps, net_worth_list):
-            if ts.time() >= datetime.strptime('09:30:00', '%H:%M:%S').time() and ts.time() <= datetime.strptime('16:00:00', '%H:%M:%S').time():
+            if ts.time() >= datetime.strptime('09:30:00', '%H:%M:%S').time() and ts.time() <= datetime.strptime('13:30:00', '%H:%M:%S').time():
                 adjusted_timestamps.append(ts)
                 adjusted_net_worth_list.append(nw)
 

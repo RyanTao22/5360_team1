@@ -299,6 +299,7 @@ class FutureDataService:
         bidPrice_cols_list = ['bidPrice'+str(i) for i in range(1,6)]
         askSize_cols_list = ['askSize'+str(i) for i in range(1,6)]
         bidSize_cols_list = ['bidSize'+str(i) for i in range(1,6)]
+        now = datetime.datetime.now()
 
         for index, row in self.tqcData.iterrows():
             
@@ -320,12 +321,12 @@ class FutureDataService:
             futureData_2_exchSim_q.put(quoteSnapshot)
             futureData_2_platform_q.put(quoteSnapshot)
         '''添加一个EndOfData的信号'''
-        # endOfData = OrderBookSnapshot_FiveLevels('EndOfData', now.date(), now.time(),
-        #                                             bidPrice=[0, 0, 0, 0, 0],
-        #                                             askPrice=[0, 0, 0, 0, 0],
-        #                                             bidSize=[0, 0, 0, 0, 0],
-        #                                             askSize=[0, 0, 0, 0, 0])
-        # futureData_2_platform_q.put(endOfData)
+        endOfData = OrderBookSnapshot_FiveLevels(row.ticker+'_EndOfData', now.date(), now.time(),
+                                                    bidPrice=[0, 0, 0, 0, 0],
+                                                    askPrice=[0, 0, 0, 0, 0],
+                                                    bidSize=[0, 0, 0, 0, 0],
+                                                    askSize=[0, 0, 0, 0, 0])
+        futureData_2_platform_q.put(endOfData)
             # print(quoteSnapshot.outputAsDataFrame())
 
 # bidPrice, askPrice, bidSize, askSize = [], [], [], []
