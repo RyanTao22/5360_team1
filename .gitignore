@@ -1,3 +1,8 @@
+# dataset floders
+processedData_2024/stocks/
+processedData_2024/futuresQuotes/
+processedData_2024/futuresTrades/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
