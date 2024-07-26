@@ -23,6 +23,7 @@ import lightgbm as lgb
 from collections import deque
 from copulae.elliptical import GaussianCopula
 from scipy.stats import rankdata, norm
+
 class QuantStrategy(Strategy):
     
     def __init__(self, stratID, stratName, stratAuthor, ticker, day):
@@ -46,9 +47,85 @@ class QuantStrategy(Strategy):
             return SingleStockOrder('testTicker','2019-07-05',time.asctime(time.localtime(time.time())))
         else:
             return None
+        
+class SampleDummyStrategy(QuantStrategy):
+    def __init__(self, stratID, stratName, stratAuthor, ticker, day,
+                 tickers2Snapshots: Mapping[str,OrderBookSnapshot_FiveLevels],
+                 orderManager:OrderManager):
+        super().__init__(stratID,stratName,stratAuthor,ticker,day)
+        self.tickers2Snapshots = tickers2Snapshots
+        self.orderManager = orderManager
+
+    def run(self,execution:SingleStockExecution)->list[SingleStockOrder]:
+        if execution is None:#######on receive market data
+            ####get most recent market data for ticker
+            ticker1 = "2610"
+            ticker2 = "3374"
+            ticker1MarketData:list[pd.DataFrame] = self.tickers2Snapshots[ticker1]
+            ticker2MarketData:list[pd.DataFrame] = self.tickers2Snapshots[ticker2]
+            ticker1RecentMarketData = None
+            ticker2RecentMarketData = None
+
+            if len(ticker1MarketData) > 0:
+                ticker1RecentMarketData = ticker1MarketData[-1]
+
+            if len(ticker2MarketData) > 0:
+                ticker2RecentMarketData = ticker2MarketData[-1]
+
+            if ticker1RecentMarketData is not None and ticker2RecentMarketData is not None:
+                #########do some calculation with the recent market data
+                #.....
+                from datetime import datetime
+                now = datetime.now()
+                sampleOrder1 = SingleStockOrder(
+                    ticker="2610",
+                    date=now.date(),
+                    submissionTime=now.time()
+                )
+                sampleOrder1.orderID = f"{self.getStratID()}-2610-{str(uuid1())}"
+                sampleOrder1.type = "MO"
+                sampleOrder1.currStatus = "New"
+                sampleOrder1.currStatusTime = now.time()
+                sampleOrder1.direction = 1
+                sampleOrder1.size = 1
+                sampleOrder1.stratID = self.getStratID()
+
+                sampleOrder2 = SingleStockOrder(
+                    ticker="3374",
+                    date=now.date(),
+                    submissionTime=now.time()
+                )
+                sampleOrder2.orderID = f"{self.getStratID()}-3374-{str(uuid1())}"
+                sampleOrder2.type = "LO"
+                sampleOrder2.currStatus = "New"
+                sampleOrder2.currStatusTime = now.time()
+                sampleOrder2.direction = 1###1 = buy; -1 = sell
+                sampleOrder2.size = 2
+                sampleOrder2.price = ticker2RecentMarketData['bidPrice5'].item()
+                sampleOrder2.stratID = self.getStratID()
+
+
+                ######return a list
+                return [sampleOrder1,sampleOrder2]
+        else:
+            #######on receive execution
+            order = self.orderManager.lookupOrderID(execution.orderID)
+
+            ######do something
+
+            ####e.g. issue cancel order
+            # if order.type == "LO":
+            #     order.type = "CANCEL"
+            return []
+
+
+
+        return []
+
+
                 
 
-class SampleDummyStrategy(QuantStrategy):
+class InDevelopingStrategy(QuantStrategy):
     def __init__(self, stratID, stratName, stratAuthor, ticker, day,
                  tickers2Snapshots: Mapping[str,OrderBookSnapshot_FiveLevels],
                  orderManager:OrderManager):
