@@ -24,12 +24,13 @@ class MarketDataService:
     cData = {}
 
 
-    def __init__(self, marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime,stockCodes,playSpeed, isReady=None):
+    def __init__(self, marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime,stockCodes,playSpeed,backTest, isReady=None):
         self.startDate = startDate
         self.endDate = endDate
         self.startTime = startTime
         self.stockCodes = stockCodes
         self.playSpeed = playSpeed
+        self.backTest = backTest
 
         print("[%d]<<<<< call MarketDataService.init" % (os.getpid(),))
         # time.sleep(3)
@@ -157,7 +158,7 @@ class MarketDataService:
                                                          askPrice=row["SP1":"SP5"].tolist(),
                                                          bidSize=row["BV1":"BV5"].tolist(),
                                                          askSize=row["SV1":"SV5"].tolist())
-            time.sleep(diff)
+            if not self.backTest: time.sleep(diff)
             marketData_2_exchSim_q.put(quoteSnapshot)
             marketData_2_platform_q.put(quoteSnapshot)
         '''添加一个EndOfData的信号'''

@@ -33,12 +33,13 @@ class FutureDataService:
     tqcData = {}
 
 
-    def __init__(self, futureData_2_exchSim_q, futureData_2_platform_q, startDate, endDate, startTime,futuresCodes,playSpeed, isReady=None):
+    def __init__(self, futureData_2_exchSim_q, futureData_2_platform_q, startDate, endDate, startTime,futuresCodes,playSpeed, backTest,isReady=None):
         self.startDate = startDate
         self.endDate = endDate
         self.startTime = startTime
         self.futureCodes = futuresCodes
         self.playSpeed = playSpeed
+        self.backTest = backTest
 
         print("[%d]<<<<< call FutureDataService.init" % (os.getpid(),))
         #time.sleep(3) #let marketDataService to unzip first
@@ -229,6 +230,7 @@ class FutureDataService:
             self.qcData = pd.concat([self.qcData, self.qfData[future]], axis=0, ignore_index=False)
 
         self.qfData = {}
+        print(self.qcData)
         self.qcData = self.qcData.sort_values(by=['date','time'], ascending=True)
         print("end to concatQuotesRows")
 
@@ -314,7 +316,7 @@ class FutureDataService:
                                                             askSize=[row[askSize_cols_list[i]] for i in range(5)],
                                                             bidSize=[row[bidSize_cols_list[i]] for i in range(5)]
                                                          )
-            time.sleep(diff)
+            if not self.backTest: time.sleep(diff)
             futureData_2_exchSim_q.put(quoteSnapshot)
             futureData_2_platform_q.put(quoteSnapshot)
         '''添加一个EndOfData的信号'''

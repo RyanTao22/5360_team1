@@ -20,16 +20,7 @@ from datetime import datetime, timedelta
 
 
 # def back_test(startDate, endDate, startTime,stockCodes,futuresCodes,playSpeed):
-def back_test():
-    
-    stockCodes = ['0050', '2392', '2498', '2610', '2618', '3035', '3264', '3374', '5347', '6443']
-    futuresCodes = ['DBF1', 'GLF1', 'HCF1', 'HSF1', 'IPF1', 'NEF1', 'NLF1', 'NYF1', 'QLF1', 'RLF1']
-    endDate = '2024-06-28'
-    startDate = '2024-06-28'
-    startTime = 90515869
-    playSpeed = 0.2
-    initial_cash = 1000000.0
-    debug = False
+def back_test(startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed,debug):
 
     marketData_2_exchSim_q = Queue()
     marketData_2_platform_q = Queue()
@@ -48,10 +39,13 @@ def back_test():
 
     analysis_q = Queue()
     '''
+    The variable that we are interested and wish to be plotted and updated every 1 seconds. 
+    How it grows:
     self.analysis_q.put({
                 'timestamp': ticker1RecentMarketData['time'],
                 'cash': self.cash[-1],
                 'networth': netWrorth,
+                'baseline_networth': netWrorth,
                 'positions_'+ticker1: self.positions[ticker1][-1],
                 'positions_'+ticker2: self.positions[ticker2][-1],
                 'midPrice_'+ticker1: self.midPrices[ticker1][-1],
@@ -75,11 +69,13 @@ def back_test():
 
 
 if __name__ == '__main__':
-    worth = [1000000]
-    timestamp = []
+    stockCodes = ['0050', '2392', '2498', '2610', '2618', '3035', '3264', '3374', '5347', '6443']
+    futuresCodes = ['DBF1', 'GLF1', 'HCF1', 'HSF1', 'IPF1', 'NEF1', 'NLF1', 'NYF1', 'QLF1', 'RLF1']
+    endDate = '2024-06-28'
+    startDate = '2024-06-28'
+    startTime = 90515869
+    playSpeed = 0.2
+    initial_cash = 1000000.0
+    debug = False
     
-    
-    back_test()
-    # while shared_analysis_list != []:
-    #     print(shared_analysis_list[-1])
-    #     time.sleep(1)
+    back_test(startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed,debug)

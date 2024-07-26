@@ -47,7 +47,7 @@ class TradingPlatform:
         ######init strat
         strat = SampleDummyStrategy(
             stratID="dummy1",stratName="dummy1",stratAuthor="hongsongchou",day="20230706",
-            ticker=["2610","3374"],tickers2Snapshots=self.tickers2Snapshots,
+            ticker=stockCodes,tickers2Snapshots=self.tickers2Snapshots,
             orderManager=self.orderManager,
             initial_cash=initial_cash,analysis_queue=analysis_q
         )
@@ -83,7 +83,7 @@ class TradingPlatform:
         while True:
             res:OrderBookSnapshot_FiveLevels = marketData_2_platform_q.get()
             print('[%d] Platform.on_md' % (os.getpid()))
-            print(res.outputAsDataFrame())
+            #$print(res.outputAsDataFrame())
 
             ######updating tickers2Snapshots
             self.tickers2Snapshots[res.ticker].append(res.outputAsDataFrame())

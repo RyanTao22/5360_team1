@@ -86,11 +86,20 @@ class SampleDummyStrategy(QuantStrategy):
                 ticker1RecentMarketData = ticker1MarketData[-1]
                 '''更新价格1'''
                 self.midPrices[ticker1].append((ticker1RecentMarketData['bidPrice1'] + ticker1RecentMarketData['askPrice1'])/2)
+                #print('更新价格1',ticker1RecentMarketData['time'])
+                #df['date'] + pd.to_timedelta(df['time'].astype(str))
+                self.timestamp.append(pd.to_datetime(ticker1RecentMarketData['date'])  + pd.to_timedelta(ticker1RecentMarketData['time'].astype(str)))
+                #self.timestamp.append(pd.to_datetime(ticker1RecentMarketData['date']  + ticker1RecentMarketData['time']))
 
             if len(ticker2MarketData) > 0:
                 ticker2RecentMarketData = ticker2MarketData[-1]
                 '''更新价格2'''
                 self.midPrices[ticker2].append((ticker2RecentMarketData['bidPrice1'] + ticker2RecentMarketData['askPrice1'])/2)
+                #print('更新价格2',ticker2RecentMarketData['time'])
+                #self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'].to_string + ' ' + ticker2RecentMarketData['time']))
+                # unsupported operand type(s) for +: 'DatetimeArray' and 'str'
+                self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'])  + pd.to_timedelta(ticker2RecentMarketData['time'].astype(str)))
+                #self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'] + ticker2RecentMarketData['time']))
 
             '''使用更新后的价格计算净值'''
             netWrorth = self.cash[-1]
@@ -99,11 +108,11 @@ class SampleDummyStrategy(QuantStrategy):
             if len(self.positions[ticker2]) > 0:
                 netWrorth += self.positions[ticker2][-1] * self.midPrices[ticker2][-1]
             
-
+            #print(self.timestamp[-1],self.cash[-1],netWrorth)
             '''记录到共享队列analysis_q中'''
             # update analysis: timestamp, networth, cash
             self.analysis_q.put({
-                'timestamp': ticker1RecentMarketData['time'],
+                'timestamp':  self.timestamp[-1],
                 'cash': self.cash[-1],
                 'networth': netWrorth,
                 'positions_'+ticker1: self.positions[ticker1][-1],
@@ -481,7 +490,7 @@ class InDevelopingStrategy(QuantStrategy):
                 self.pnl.append(self.pnl[-1] - tradesize * direction * tradeprice)
                 self.cash.append(self.cash[-1] - tradesize * direction * tradeprice)
                 '''price1 和 price2 应该取最新的成交价，具体那个字段我目前不太清楚'''
-                
+
                 self.networth.append(self.position[self.tickers[0]][-1] * price1 + self.position[self.tickers[1]][
                     -1] * price2 + self.cash[-1])
 
