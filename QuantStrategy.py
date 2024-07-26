@@ -55,6 +55,9 @@ class SampleDummyStrategy(QuantStrategy):
         super().__init__(stratID,stratName,stratAuthor,ticker,day)
         self.tickers2Snapshots = tickers2Snapshots
         self.orderManager = orderManager
+        self.holding = {}
+        self.networth = [10000000.0]
+        self.timestamp = []
 
     def run(self,execution:SingleStockExecution)->list[SingleStockOrder]:
         if execution is None:#######on receive market data

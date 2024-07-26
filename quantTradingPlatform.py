@@ -27,12 +27,12 @@ from marketDataServiceConfig import MarketDataServiceConfig
 class TradingPlatform:
 
     def __init__(self, marketData_2_platform_q, platform_2_exchSim_order_q,platform_2_futuresExchSim_order_q,
-                 exchSim_2_platform_execution_q,isReady=None,debug=True):
+                 exchSim_2_platform_execution_q,stockCodes,futuresCodes,isReady=None,debug=True):
         print("[%d]<<<<< call Platform.init" % (os.getpid(),))
         self.isReady = isReady
         self.debug = debug
-        stockCodes = MarketDataServiceConfig.stockCodes
-        futuresCodes = MarketDataServiceConfig.futureCodes
+        # stockCodes = MarketDataServiceConfig.stockCodes
+        # futuresCodes = MarketDataServiceConfig.futureCodes
         self.qMapping:Mapping[str,Queue] = {stock:platform_2_exchSim_order_q for stock in stockCodes}
         self.qMapping.update({futures:platform_2_futuresExchSim_order_q for futures in futuresCodes})
 

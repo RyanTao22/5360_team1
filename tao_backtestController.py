@@ -19,44 +19,36 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
-def back_test(self, start_date, end_date):
-    trading_dates_list = pd.read_csv('trading_dates.csv')
-    start_date_dt = datetime.strptime(start_date, '%Y%m%d')
-    end_date_dt = datetime.strptime(end_date, '%Y%m%d')
-    target_dates = trading_dates_list[(trading_dates_list['date'] >= start_date) & (trading_dates_list['date'] <= end_date)]['date'].tolist()
-    num_days = len(target_dates)
+def back_test(self, startDate, endDate, startTime,stockCodes,futuresCodes,playSpeed):
     
+    stockCodes = MarketDataServiceConfig.stockCodes
+    futuresCodes = MarketDataServiceConfig.futureCodes
 
-    for target_date in target_dates:
+    marketData_2_exchSim_q = Queue()
+    marketData_2_platform_q = Queue()
 
-        stockCodes = MarketDataServiceConfig.stockCodes
-        futuresCodes = MarketDataServiceConfig.futureCodes
+    futureData_2_exchSim_q = Queue()
+    futureData_2_platform_q = Queue()
+    
+    platform_2_exchSim_order_q = Queue()
+    exchSim_2_platform_execution_q = Queue()
 
-        marketData_2_exchSim_q = Queue()
-        marketData_2_platform_q = Queue()
+    platform_2_futuresExchSim_order_q = Queue()
 
-        futureData_2_exchSim_q = Queue()
-        futureData_2_platform_q = Queue()
-        
-        platform_2_exchSim_order_q = Queue()
-        exchSim_2_platform_execution_q = Queue()
+    platform_2_strategy_md_q = Queue()
+    strategy_2_platform_order_q = Queue()
+    platform_2_strategy_execution_q = Queue()
 
-        platform_2_futuresExchSim_order_q = Queue()
+    isReady = None#Value('i',0)
 
-        platform_2_strategy_md_q = Queue()
-        strategy_2_platform_order_q = Queue()
-        platform_2_strategy_execution_q = Queue()
+    Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q,startDate, endDate, startTime,stockCodes,playSpeed,isReady, )).start()
+    Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, futureData_2_platform_q,isReady,startDate, endDate, startTime,futuresCodes,playSpeed,isReady,)).start()
 
-        isReady = None#Value('i',0)
-
-        Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q,isReady, )).start()
-        Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, futureData_2_platform_q,isReady,)).start()
-
-        Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q,exchSim_2_platform_execution_q,stockCodes,isReady,True,)).start()
-        Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q,exchSim_2_platform_execution_q,futuresCodes,isReady,True,)).start()
+    Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q,exchSim_2_platform_execution_q,stockCodes,isReady,True,)).start()
+    Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q,exchSim_2_platform_execution_q,futuresCodes,isReady,True,)).start()
 
 
-        Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q,platform_2_futuresExchSim_order_q,exchSim_2_platform_execution_q,isReady,True,)).start()
+    Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q,platform_2_futuresExchSim_order_q,exchSim_2_platform_execution_q,isReady,True,)).start()
             
 
     return self.networth, self.timestamp
