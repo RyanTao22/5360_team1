@@ -251,7 +251,6 @@ def back_test():
             str(results['max_drawdown_period'][1].strftime('%Y%m%d %H:%M:%S%z')+';'+results['max_drawdown_period'][0].strftime('%Y%m%d %H:%M:%S%z')),
             fig
         )
-
     
     app.run_server(debug=True)
 

@@ -48,22 +48,35 @@ class QuantStrategy(Strategy):
         else:
             return None
         
+
 class SampleDummyStrategy(QuantStrategy):
-    def __init__(self, stratID, stratName, stratAuthor, ticker, day,
+    def __init__(self, stratID, stratName, stratAuthor, day, ticker,
                  tickers2Snapshots: Mapping[str,OrderBookSnapshot_FiveLevels],
-                 orderManager:OrderManager):
+                 orderManager:OrderManager, initial_cash, analysis_queue):
         super().__init__(stratID,stratName,stratAuthor,ticker,day)
         self.tickers2Snapshots = tickers2Snapshots
         self.orderManager = orderManager
-        self.holding = {}
-        self.networth = [10000000.0]
+
+        self.analysis_q = analysis_queue
+        self.execution_record = []
+        
+        self.positions = {self.ticker[0]:[0], self.ticker[1]: [0]}
+        self.cash = [initial_cash]
+        self.networth = [initial_cash]
+        self.midPrices = {self.ticker[0]:[0], self.ticker[1]: [0]}
+
+        # self.baseline_cash = initial_cash
+        # self.baseline_networth = initial_cash
+        # self.baseline_positions = {}
+    
         self.timestamp = []
 
     def run(self,execution:SingleStockExecution)->list[SingleStockOrder]:
+        ticker1 = self.ticker[0]
+        ticker2 = self.ticker[1]
         if execution is None:#######on receive market data
             ####get most recent market data for ticker
-            ticker1 = "2610"
-            ticker2 = "3374"
+            
             ticker1MarketData:list[pd.DataFrame] = self.tickers2Snapshots[ticker1]
             ticker2MarketData:list[pd.DataFrame] = self.tickers2Snapshots[ticker2]
             ticker1RecentMarketData = None
@@ -71,9 +84,35 @@ class SampleDummyStrategy(QuantStrategy):
 
             if len(ticker1MarketData) > 0:
                 ticker1RecentMarketData = ticker1MarketData[-1]
+                '''更新价格1'''
+                self.midPrices[ticker1].append((ticker1RecentMarketData['bidPrice1'] + ticker1RecentMarketData['askPrice1'])/2)
 
             if len(ticker2MarketData) > 0:
                 ticker2RecentMarketData = ticker2MarketData[-1]
+                '''更新价格2'''
+                self.midPrices[ticker2].append((ticker2RecentMarketData['bidPrice1'] + ticker2RecentMarketData['askPrice1'])/2)
+
+            '''使用更新后的价格计算净值'''
+            netWrorth = self.cash[-1]
+            if len(self.positions[ticker1]) > 0:
+                netWrorth += self.positions[ticker1][-1] * self.midPrices[ticker1][-1]
+            if len(self.positions[ticker2]) > 0:
+                netWrorth += self.positions[ticker2][-1] * self.midPrices[ticker2][-1]
+            
+
+            '''记录到共享队列analysis_q中'''
+            # update analysis: timestamp, networth, cash
+            self.analysis_q.put({
+                'timestamp': ticker1RecentMarketData['time'],
+                'cash': self.cash[-1],
+                'networth': netWrorth,
+                'positions_'+ticker1: self.positions[ticker1][-1],
+                'positions_'+ticker2: self.positions[ticker2][-1],
+                'midPrice_'+ticker1: self.midPrices[ticker1][-1],
+                'midPrice_'+ticker2: self.midPrices[ticker2][-1]
+            })
+            
+
 
             if ticker1RecentMarketData is not None and ticker2RecentMarketData is not None:
                 #########do some calculation with the recent market data
@@ -107,12 +146,28 @@ class SampleDummyStrategy(QuantStrategy):
                 sampleOrder2.price = ticker2RecentMarketData['bidPrice5'].item()
                 sampleOrder2.stratID = self.getStratID()
 
-
+                
+                
                 ######return a list
                 return [sampleOrder1,sampleOrder2]
         else:
             #######on receive execution
             order = self.orderManager.lookupOrderID(execution.orderID)
+
+            
+            '''记录持仓'''
+            ticker, tradesize, direction, tradeprice = execution.ticker, execution.size, execution.direction,execution.price
+            self.execution_record.append({
+                'timestamp': execution.timeStamp,
+                'ticker': ticker,
+                'size': tradesize,
+                'direction': direction,
+                'price': tradeprice
+            })
+            '''更新仓位现金'''
+            self.positions[ticker].append(self.positions[ticker][-1] + tradesize * direction)
+            self.cash.append(self.cash[-1] - tradesize * direction * tradeprice)
+
 
             ######do something
 
@@ -120,8 +175,6 @@ class SampleDummyStrategy(QuantStrategy):
             # if order.type == "LO":
             #     order.type = "CANCEL"
             return []
-
-
 
         return []
 

@@ -27,7 +27,7 @@ from marketDataServiceConfig import MarketDataServiceConfig
 class TradingPlatform:
 
     def __init__(self, marketData_2_platform_q, platform_2_exchSim_order_q,platform_2_futuresExchSim_order_q,
-                 exchSim_2_platform_execution_q,stockCodes,futuresCodes,isReady=None,debug=True):
+                 exchSim_2_platform_execution_q,stockCodes,futuresCodes,initial_cash,analysis_q,isReady=None,debug=True):
         print("[%d]<<<<< call Platform.init" % (os.getpid(),))
         self.isReady = isReady
         self.debug = debug
@@ -42,11 +42,14 @@ class TradingPlatform:
         self.orderManager = OrderManager(debug=debug)
         self.tickers2Snapshots: Mapping[str,list[pd.DataFrame]] = defaultdict(lambda: [])
 
+        
+
         ######init strat
         strat = SampleDummyStrategy(
             stratID="dummy1",stratName="dummy1",stratAuthor="hongsongchou",day="20230706",
             ticker=["2610","3374"],tickers2Snapshots=self.tickers2Snapshots,
-            orderManager=self.orderManager
+            orderManager=self.orderManager,
+            initial_cash=initial_cash,analysis_queue=analysis_q
         )
 
         self.quantStrats:Mapping[str,QuantStrategy] = {

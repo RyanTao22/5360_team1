@@ -88,7 +88,7 @@ class OrderBookManager:
             self.addToBidQ(buyOrder, dt=now)
 
     def addToBidQ(self, buyOrder: SingleStockOrder, dt):
-        self.__bidQ.put((-buyOrder.price, dt, buyOrder))
+        self.__bidQ.put((-1*buyOrder.price, dt, buyOrder))
 
     def addToAskQ(self, sellOrder:SingleStockOrder, dt):
         self.__askQ.put((sellOrder.price, dt, sellOrder))

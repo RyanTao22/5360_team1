@@ -73,7 +73,7 @@ class MarketDataService:
         for stock in self.stockCodes:
             for tDate in tDates:
                 stockDataFileName = MarketDataServiceConfig.mainDir + MarketDataServiceConfig.stocksPath + stock + "_md_" + tDate + "_" + tDate + ".csv.gz"
-                print(stockDataFileName)
+                # print(stockDataFileName)
                 # concat stock's different month's data
                 if os.path.exists(stockDataFileName):
                     if stock not in self.rawData: self.rawData[stock] = pd.read_csv(stockDataFileName, compression='gzip', index_col=0)
@@ -148,7 +148,11 @@ class MarketDataService:
         for index, row in self.cData.iterrows():
             diff = float(row['ts_diff'])/1000/self.playSpeed
             now = datetime.datetime.now()
-            quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, now.date(), now.time(),
+            # date should be row['date'] in a proper format as now.date() (from 2024-04-01)
+            # time should be row['time'] in a proper format as now.time() (from 90515951: 09:05:15.951000)
+
+            quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, datetime.datetime.strptime(row['date'], '%Y-%m-%d'),
+                                                         datetime.datetime.strptime(str(row['time']), '%H%M%S%f').time(),
                                                          bidPrice=row["BP1":"BP5"].tolist(),
                                                          askPrice=row["SP1":"SP5"].tolist(),
                                                          bidSize=row["BV1":"BV5"].tolist(),
@@ -156,12 +160,13 @@ class MarketDataService:
             time.sleep(diff)
             marketData_2_exchSim_q.put(quoteSnapshot)
             marketData_2_platform_q.put(quoteSnapshot)
-        quoteEndOfData = OrderBookSnapshot_FiveLevels('EndOfData', now.date(), now.time(),
-                                                      bidPrice=[0, 0, 0, 0, 0],
-                                                      askPrice=[0, 0, 0, 0, 0],
-                                                      bidSize=[0, 0, 0, 0, 0],
-                                                      askSize=[0, 0, 0, 0, 0])
-        marketData_2_platform_q.put(quoteEndOfData)
+        '''添加一个EndOfData的信号'''
+        # quoteEndOfData = OrderBookSnapshot_FiveLevels('EndOfData', now.date(), now.time(),
+        #                                               bidPrice=[0, 0, 0, 0, 0],
+        #                                               askPrice=[0, 0, 0, 0, 0],
+        #                                               bidSize=[0, 0, 0, 0, 0],
+        #                                               askSize=[0, 0, 0, 0, 0])
+        # marketData_2_platform_q.put(quoteEndOfData)
             # print(quoteSnapshot.outputAsDataFrame())
 
 
