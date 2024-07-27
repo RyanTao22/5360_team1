@@ -147,7 +147,7 @@ def back_test_analysis():
             html.Label('ticker1', style={'font-weight': 'bold'}),
             dcc.Input(id='ticker1', value='2610', type='text', style={'margin-bottom': '10px'}),
             html.Label('ticker2', style={'font-weight': 'bold'}),
-            dcc.Input(id='ticker2', value='3374', type='text', style={'margin-bottom': '10px'}),
+            dcc.Input(id='ticker2', value='NEF1', type='text', style={'margin-bottom': '10px'}),
             html.Button('Run Backtest', id='run_backtest', n_clicks=0, style={'background-color': '#4CAF50', 'color': 'white', 'padding': '10px', 'border': 'none', 'cursor': 'pointer', 'font-weight': 'bold', 'float': 'right'}),
 
             # todo: BackTest按钮
