@@ -49,8 +49,8 @@ class TradingPlatform:
         print("[%d]<<<<< call Platform.init" % (os.getpid(),))
         self.isReady = isReady
         self.debug = debug
-        # self.stockCodes = stockCodes = MarketDataServiceConfig.stockCodes
-        # self.futuresCodes = futuresCodes = MarketDataServiceConfig.futureCodes
+        self.stockCodes = stockCodes = MarketDataServiceConfig.stockCodes
+        self.futuresCodes = futuresCodes = MarketDataServiceConfig.futureCodes
         self.qMapping:Mapping[str,Queue] = {stock:platform_2_exchSim_order_q for stock in stockCodes}
         self.qMapping.update({futures:platform_2_futuresExchSim_order_q for futures in futuresCodes})
 

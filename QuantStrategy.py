@@ -19,6 +19,7 @@ from common.Strategy import Strategy
 from common.SingleStockOrder import SingleStockOrder
 from common.SingleStockExecution import SingleStockExecution
 from datetime import datetime
+import numpy as np
 import lightgbm as lgb
 from collections import deque
 from copulae.elliptical import GaussianCopula
