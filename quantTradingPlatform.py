@@ -45,12 +45,12 @@ logger.addHandler(handler)
 class TradingPlatform:
 
     def __init__(self, marketData_2_platform_q, platform_2_exchSim_order_q,platform_2_futuresExchSim_order_q,
-                 exchSim_2_platform_execution_q,isReady=None,debug=True):
+                 exchSim_2_platform_execution_q,stockCodes,futuresCodes,initial_cash,analysis_q,isReady=None,debug=True):
         print("[%d]<<<<< call Platform.init" % (os.getpid(),))
         self.isReady = isReady
         self.debug = debug
-        self.stockCodes = stockCodes = MarketDataServiceConfig.stockCodes
-        self.futuresCodes = futuresCodes = MarketDataServiceConfig.futureCodes
+        # self.stockCodes = stockCodes = MarketDataServiceConfig.stockCodes
+        # self.futuresCodes = futuresCodes = MarketDataServiceConfig.futureCodes
         self.qMapping:Mapping[str,Queue] = {stock:platform_2_exchSim_order_q for stock in stockCodes}
         self.qMapping.update({futures:platform_2_futuresExchSim_order_q for futures in futuresCodes})
 
@@ -64,11 +64,14 @@ class TradingPlatform:
             'futures_trades':defaultdict(lambda: []),
         }
 
+        self.stockCodes = stockCodes
+        self.futuresCodes = futuresCodes
         ######init strat
         strat = SampleDummyStrategy(
             stratID="dummy1",stratName="dummy1",stratAuthor="hongsongchou",day="20230706",
             ticker=["2610","NEF1"],tickers2Snapshots=self.tickers2Snapshots,
-            orderManager=self.orderManager
+            orderManager=self.orderManager,
+            initial_cash=initial_cash,analysis_queue=analysis_q            
         )
 
         self.quantStrats:Mapping[str,QuantStrategy] = {
@@ -84,7 +87,7 @@ class TradingPlatform:
             elif isinstance(strat.ticker,str):
                 self.tickers2Strats[strat.ticker] += [strat]
 
-        t_md = threading.Thread(name='platform.on_marketData', target=self.consume_marketData, args=( marketData_2_platform_q,))
+        t_md = threading.Thread(name='platform.on_marketData', target=self.consume_marketData, args=( marketData_2_platform_q,analysis_q,))
         t_md.start()
         
         t_exec = threading.Thread(name='platform.on_exec', target=self.handle_execution, args=(exchSim_2_platform_execution_q, ))
@@ -124,7 +127,7 @@ class TradingPlatform:
         logger.info(f"tickers2Snapshots: {logMsg}")
 
 
-    def consume_marketData(self, marketData_2_platform_q):
+    def consume_marketData(self, marketData_2_platform_q,analysis_q):
         # print('[%d]Platform.consume_marketData' % (os.getpid(),))
         self.loopUntilReady()
         logger.info("Listen to market data")
@@ -132,6 +135,12 @@ class TradingPlatform:
             res:OrderBookSnapshot_FiveLevels = marketData_2_platform_q.get()
             # print('[%d] Platform.on_md' % (os.getpid()))
             # print(res.outputAsDataFrame())
+
+            
+            '''判断数据是否都更新完成'''
+            if res.ticker.endswith('_EndOfData'): 
+                analysis_q.put({'signal':'EndOfData'})
+                print('signal EndOfData----------------------------------------------------------------------------------------------------')
 
             ######updating tickers2Snapshots
             self.updateTickers2Snapshots(res)
