@@ -33,14 +33,7 @@ class FutureDataService:
     tqcData = {}
 
 
-    def __init__(self, futureData_2_exchSim_q, futureData_2_platform_q, startDate, endDate, startTime,futuresCodes,playSpeed, backTest,isReady=None):
-        self.startDate = startDate
-        self.endDate = endDate
-        self.startTime = startTime
-        self.futureCodes = futuresCodes
-        self.playSpeed = playSpeed
-        self.backTest = backTest
-
+    def __init__(self, futureData_2_exchSim_q, futureData_2_platform_q,isReady=None):
         print("[%d]<<<<< call FutureDataService.init" % (os.getpid(),))
         #time.sleep(3) #let marketDataService to unzip first
         # self.produce_market_data(marketData_2_exchSim_q, marketData_2_platform_q)
@@ -67,7 +60,6 @@ class FutureDataService:
 
         print("[%d]<<<<< call FutureDataService.calculateTimestampDiff" % (os.getpid(),))
         self.calculateTimestampDiff()
-
 
         if isReady is not None:
             while isReady.value==0:
@@ -104,20 +96,15 @@ class FutureDataService:
     def loadinFutureQuotesAndFilterbyTargetDataAndStartTime(self):
         print("start to loadinFutureQuotesAndFilterbyTargetDataAndStartTime")
 
-        year_month_pairs = set(pd.date_range(start=self.startDate, end=self.endDate).strftime('%Y%m'))
-        tDates = list(year_month_pairs)
+        tDate = MarketDataServiceConfig.targetDate[0:4] + MarketDataServiceConfig.targetDate[5:7]
 
-        for future in self.futureCodes:
-            for tDate in tDates:
-                futureDataFileName = MarketDataServiceConfig.mainDir + MarketDataServiceConfig.futuresQuotesPath + future + "_md_" + tDate + "_" + tDate + ".csv.gz"
-                #print(futureDataFileName)
-                if os.path.exists(futureDataFileName):
-                    if future not in self.rawData: self.rawData[future] = pd.read_csv(futureDataFileName, compression='gzip')
-                    else:                          self.rawData[future] = pd.concat([self.rawData[future], pd.read_csv(futureDataFileName, compression='gzip')], axis=0, ignore_index=True)
+        for future in MarketDataServiceConfig.futureCodes:
+            futureDataFileName = MarketDataServiceConfig.mainDir + MarketDataServiceConfig.futuresQuotesPath + future + "_md_" + tDate + "_" + tDate + ".csv.gz"
+            print(futureDataFileName)
+            self.rawData[future] = pd.read_csv(futureDataFileName, compression='gzip', index_col=0)
             print("Done future " + future)
-            self.qfData[future] = self.rawData[future].loc[self.rawData[future]['date']>= self.startDate]
-            self.qfData[future] = self.qfData[future].loc[self.qfData[future]['date'] <= self.endDate]
-            self.qfData[future] = self.qfData[future].loc[self.qfData[future]['time'] > self.startTime]
+            self.qfData[future] = self.rawData[future].loc[self.rawData[future].index == MarketDataServiceConfig.targetDate]
+            self.qfData[future] = self.qfData[future].loc[self.qfData[future]['time'] > MarketDataServiceConfig.startTime]
 
             print("Done filter by date and time " + future)
 
@@ -126,21 +113,16 @@ class FutureDataService:
 
     def loadinFutureTradesAndFilterbyTargetDataAndStartTime(self):
         print("start to loadinFutureTradesAndFilterbyTargetDataAndStartTime")
-        
-        year_month_pairs = set(pd.date_range(start=self.startDate, end=self.endDate).strftime('%Y%m'))
-        tDates = list(year_month_pairs)
 
-        for future in self.futureCodes:
-            for tDate in tDates:
-                futureDataFileName = MarketDataServiceConfig.mainDir + MarketDataServiceConfig.futuresTradesPath + future + "_mdT_" + tDate + "_" + tDate + ".csv.gz"
-                #print(futureDataFileName)
-                if os.path.exists(futureDataFileName):
-                    if future not in self.rawtData: self.rawtData[future] = pd.read_csv(futureDataFileName, compression='gzip')
-                    else:                         self.rawtData[future] = pd.concat([self.rawtData[future], pd.read_csv(futureDataFileName, compression='gzip')], axis=0, ignore_index=True)
+        tDate = MarketDataServiceConfig.targetDate[0:4] + MarketDataServiceConfig.targetDate[5:7]
+
+        for future in MarketDataServiceConfig.futureCodes:
+            futureDataFileName = MarketDataServiceConfig.mainDir + MarketDataServiceConfig.futuresTradesPath + future + "_mdT_" + tDate + "_" + tDate + ".csv.gz"
+            print(futureDataFileName)
+            self.rawtData[future] = pd.read_csv(futureDataFileName, compression='gzip', index_col=0)
             print("Done future " + future)
-            self.tfData[future] = self.rawtData[future].loc[self.rawtData[future]['Date'] >= self.startDate]
-            self.tfData[future] = self.tfData[future].loc[self.tfData[future]['Date'] <= self.endDate]
-            self.tfData[future] = self.tfData[future].loc[self.tfData[future]['Time'] > self.startTime]
+            self.tfData[future] = self.rawtData[future].loc[self.rawtData[future].index == MarketDataServiceConfig.targetDate]
+            self.tfData[future] = self.tfData[future].loc[self.tfData[future]['Time'] > MarketDataServiceConfig.startTime]
 
             print("Done filter by date and time " + future)
 
@@ -171,7 +153,7 @@ class FutureDataService:
     def futureQuotesCleaningAndPreProcessing(self):
         print("start to futureQuotesCleaningAndPreProcessing")
 
-        for future in self.futureCodes:
+        for future in MarketDataServiceConfig.futureCodes:
             self.qfData[future] = self.qfData[future][self.qfData[future]['askPrice1'] > 0]
             self.qfData[future] = self.qfData[future][self.qfData[future]['bidPrice1'] > 0]
             self.qfData[future] = self.qfData[future][self.qfData[future]['askPrice1'] > self.qfData[future]['bidPrice1']]
@@ -188,7 +170,7 @@ class FutureDataService:
     def futureTradesCleaningAndPreProcessing(self):
         print("start to futureTradesCleaningAndPreProcessing")
 
-        for future in self.futureCodes:
+        for future in MarketDataServiceConfig.futureCodes:
             # qfData[future] = qfData[future][qfData[future]['askPrice1']>0]
             # qfData[future] = qfData[future][qfData[future]['bidPrice1']>0]
             # qfData[future] = qfData[future][qfData[future]['askPrice1']>qfData[future]['bidPrice1']]
@@ -226,34 +208,33 @@ class FutureDataService:
     def concatQuotesRows(self):
         print("start to concatQuotesRows")
         self.qcData = pd.DataFrame()
-        for future in self.futureCodes:
+        for future in MarketDataServiceConfig.futureCodes:
             self.qcData = pd.concat([self.qcData, self.qfData[future]], axis=0, ignore_index=False)
 
         self.qfData = {}
-        print(self.qcData)
-        self.qcData = self.qcData.sort_values(by=['date','time'], ascending=True)
+        self.qcData = self.qcData.sort_values(by=['time'], ascending=True)
         print("end to concatQuotesRows")
 
     def concatTradesRows(self):
         print("start to concatTradesRows")
         self.tcData = pd.DataFrame()
-        for future in self.futureCodes:
-            self.tcData = pd.concat([self.tcData, self.tfData[future]], ignore_index=True)
+        for future in MarketDataServiceConfig.futureCodes:
+            self.tcData = pd.concat([self.tcData, self.tfData[future]], ignore_index=False)
 
         self.tfData = {}
-        self.tcData = self.tcData.sort_values(by=['Date','Time'], ascending=True)
-        self.tcData = self.tcData.rename(columns={'Date':'date','Time': 'time'})
+        self.tcData = self.tcData.sort_values(by=['Time'], ascending=True)
+        self.tcData = self.tcData.rename(columns={'Time': 'time'})
 
         print("end to concatTradesRows")
 
     def concatQuotesWithTrades(self):
         print("start to concatQuotesWithTrades")
         self.tqcData = pd.DataFrame()
-        self.tqcData = pd.concat([self.qcData, self.tcData], ignore_index=True)
+        self.tqcData = pd.concat([self.qcData, self.tcData], ignore_index=False)
         self.qcData = {}
         self.tcData = {}
 
-        self.tqcData = self.tqcData.sort_values(by=['date','time'], ascending=True)
+        self.tqcData = self.tqcData.sort_values(by=['time'], ascending=True)
         print("end to concatQuotesWithTrades")
 
 
@@ -266,7 +247,7 @@ class FutureDataService:
     #     for stock in MarketDataServiceConfig.stockCodes:
     #         self.cData = pd.concat([self.cData, self.fData[stock]], axis=0, ignore_index=True)
     #
-    #     self.cData = self.cData.sort_values(by=['date','time'], ascending=True)
+    #     self.cData = self.cData.sort_values(by=['time'], ascending=True)
     #     self.fData = {}
     #
     #     print("end to concatStockRows")
@@ -292,41 +273,28 @@ class FutureDataService:
     def produce_future(self, futureData_2_exchSim_q, futureData_2_platform_q):
         print("[%d]<<<<< call FutureDataService.init" % (os.getpid(),))
         print("[%d]<<<<< call start to feed future quotes and trades" % (os.getpid(),))
-        self.tqcData.sort_values(by=['date', 'time'], ascending=True, inplace=True)
-        
-        '''获取列名,避免受顺序影响'''
-        askPrice_cols_list = ['askPrice'+str(i) for i in range(1,6)]
-        bidPrice_cols_list = ['bidPrice'+str(i) for i in range(1,6)]
-        askSize_cols_list = ['askSize'+str(i) for i in range(1,6)]
-        bidSize_cols_list = ['bidSize'+str(i) for i in range(1,6)]
-        now = datetime.datetime.now()
-
+        self.tqcData.sort_index(axis=1,inplace=True)
         for index, row in self.tqcData.iterrows():
-            
-            '''如果是trades数据，就跳过'''
-            if row['type'] == 'trades':
-                continue
-            
+            diff = float(row['ts_diff'])/1000/MarketDataServiceConfig.playSpeed
+            now = datetime.datetime.now()
+            quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, now.date(), now.time(),
+                                                         bidPrice=row["bidPrice1":"bidPrice5"].tolist(),
+                                                         askPrice=row["askPrice1":"askPrice5"].tolist(),
+                                                         bidSize=row["bidSize1":"bidSize5"].tolist(),
+                                                         askSize=row["askSize1":"askSize5"].tolist())
+            quoteSnapshot.type = row.get("type")
+            quoteSnapshot.midQ = row.get("midQ")
+            quoteSnapshot.symbol = row.get("symbol")
+            quoteSnapshot.totalMatchSize = row.get("totalMatchSize")
+            quoteSnapshot.totalMatchValue = row.get("totalMatchValue")
+            quoteSnapshot.avgMatchPx = row.get("avgMatchPx")
+            quoteSnapshot.size = row.get("size")
+            quoteSnapshot.volume = row.get("volume")
+            quoteSnapshot.lastPx = row.get("lastPx")
 
-            diff = float(row['ts_diff'])/1000/self.playSpeed
-            
-            quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, datetime.datetime.strptime(row['date'], '%Y-%m-%d'),
-                                                            datetime.datetime.strptime(str(row['time']), '%H%M%S%f').time(),
-                                                            askPrice=[row[askPrice_cols_list[i]] for i in range(5)],
-                                                            bidPrice=[row[bidPrice_cols_list[i]] for i in range(5)],
-                                                            askSize=[row[askSize_cols_list[i]] for i in range(5)],
-                                                            bidSize=[row[bidSize_cols_list[i]] for i in range(5)]
-                                                         )
-            if not self.backTest: time.sleep(diff)
+            time.sleep(diff)
             futureData_2_exchSim_q.put(quoteSnapshot)
             futureData_2_platform_q.put(quoteSnapshot)
-        '''添加一个EndOfData的信号'''
-        endOfData = OrderBookSnapshot_FiveLevels(row.ticker+'_EndOfData', now.date(), now.time(),
-                                                    bidPrice=[0, 0, 0, 0, 0],
-                                                    askPrice=[0, 0, 0, 0, 0],
-                                                    bidSize=[0, 0, 0, 0, 0],
-                                                    askSize=[0, 0, 0, 0, 0])
-        futureData_2_platform_q.put(endOfData)
             # print(quoteSnapshot.outputAsDataFrame())
 
 # bidPrice, askPrice, bidSize, askSize = [], [], [], []

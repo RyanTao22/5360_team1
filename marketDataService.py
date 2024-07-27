@@ -24,14 +24,7 @@ class MarketDataService:
     cData = {}
 
 
-    def __init__(self, marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime,stockCodes,playSpeed,backTest, isReady=None):
-        self.startDate = startDate
-        self.endDate = endDate
-        self.startTime = startTime
-        self.stockCodes = stockCodes
-        self.playSpeed = playSpeed
-        self.backTest = backTest
-
+    def __init__(self, marketData_2_exchSim_q, marketData_2_platform_q,isReady=None):
         print("[%d]<<<<< call MarketDataService.init" % (os.getpid(),))
         # time.sleep(3)
         # self.produce_market_data(marketData_2_exchSim_q, marketData_2_platform_q)
@@ -67,26 +60,15 @@ class MarketDataService:
     def loadinStockDataAndFilterbyTargetDate(self):
         print("start to loadinStockDataAndFilterbyTargetDate")
 
-        # tDates: pairs of (yead and month) for the range from startDate to endDate
-        year_month_pairs = set(pd.date_range(start=self.startDate, end=self.endDate).strftime('%Y%m'))
-        tDates = list(year_month_pairs)
+        tDate = MarketDataServiceConfig.targetDate[0:4] + MarketDataServiceConfig.targetDate[5:7]
 
-        for stock in self.stockCodes:
-            for tDate in tDates:
-                stockDataFileName = MarketDataServiceConfig.mainDir + MarketDataServiceConfig.stocksPath + stock + "_md_" + tDate + "_" + tDate + ".csv.gz"
-                # print(stockDataFileName)
-                # concat stock's different month's data
-                if os.path.exists(stockDataFileName):
-                    if stock not in self.rawData: self.rawData[stock] = pd.read_csv(stockDataFileName, compression='gzip', index_col=0)
-                    else:                         self.rawData[stock] = pd.concat([self.rawData[stock], pd.read_csv(stockDataFileName, compression='gzip', index_col=0)], axis=0, ignore_index=True)
-                
-            print("Done stock " + stock + str(len(self.rawData[stock])))
-            self.fData[stock] = self.rawData[stock].loc[self.rawData[stock]['date'] >= self.startDate]
-            self.fData[stock] = self.fData[stock].loc[self.fData[stock]['date'] <= self.endDate]
-            self.fData[stock] = self.fData[stock].loc[self.fData[stock]['time'] >self.startTime]
-
-            #self.fData[stock] = self.fData[stock].sort_values(by=['date', 'time'], ascending=True)
-            #self.fData[stock].index = list(range(len(self.fData[stock])-1)) + [-1] # reset index to indicate the last row
+        for stock in MarketDataServiceConfig.stockCodes:
+            stockDataFileName = MarketDataServiceConfig.mainDir + MarketDataServiceConfig.stocksPath + stock + "_md_" + tDate + "_" + tDate + ".csv.gz"
+            print(stockDataFileName)
+            self.rawData[stock] = pd.read_csv(stockDataFileName, compression='gzip', index_col=0)
+            print("Done stock " + stock)
+            self.fData[stock] = self.rawData[stock].loc[self.rawData[stock]['date'] == MarketDataServiceConfig.targetDate]
+            self.fData[stock] = self.fData[stock].loc[self.fData[stock]['time'] > MarketDataServiceConfig.startTime]
 
             print("Done filter by date " + stock)
 
@@ -98,7 +80,7 @@ class MarketDataService:
 
         print("start to dataCleaningAndPreProcessing")
 
-        for stock in self.stockCodes:
+        for stock in MarketDataServiceConfig.stockCodes:
             self.fData[stock] = self.fData[stock][self.fData[stock]['SP1'] > 0]
             self.fData[stock] = self.fData[stock][self.fData[stock]['BP1'] > 0]
             self.fData[stock] = self.fData[stock][self.fData[stock]['SP1'] > self.fData[stock]['BP1']]
@@ -116,11 +98,10 @@ class MarketDataService:
         print("start to concatStockRows")
 
         self.cData = pd.DataFrame()
-        for stock in self.stockCodes:
+        for stock in MarketDataServiceConfig.stockCodes:
             self.cData = pd.concat([self.cData, self.fData[stock]], axis=0, ignore_index=True)
 
-        self.cData = self.cData.sort_values(by=['date','time'], ascending=True)
-        #self.cData = list(range(len(self.cData)-1)) + [-1]  # reset index to indicate the last row
+        self.cData = self.cData.sort_values(by=['time'], ascending=True)
         self.fData = {}
 
         print("end to concatStockRows")
@@ -147,28 +128,27 @@ class MarketDataService:
         print("[%d]<<<<< call MarketDataService.init" % (os.getpid(),))
         self.cData.sort_index(axis=1,inplace=True)
         for index, row in self.cData.iterrows():
-            diff = float(row['ts_diff'])/1000/self.playSpeed
+            diff = float(row['ts_diff'])/1000/MarketDataServiceConfig.playSpeed
             now = datetime.datetime.now()
-            # date should be row['date'] in a proper format as now.date() (from 2024-04-01)
-            # time should be row['time'] in a proper format as now.time() (from 90515951: 09:05:15.951000)
-
-            quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, datetime.datetime.strptime(row['date'], '%Y-%m-%d'),
-                                                         datetime.datetime.strptime(str(row['time']), '%H%M%S%f').time(),
+            quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, now.date(), now.time(),
                                                          bidPrice=row["BP1":"BP5"].tolist(),
                                                          askPrice=row["SP1":"SP5"].tolist(),
                                                          bidSize=row["BV1":"BV5"].tolist(),
                                                          askSize=row["SV1":"SV5"].tolist())
-            if not self.backTest: time.sleep(diff)
+            quoteSnapshot.type = "both"
+            quoteSnapshot.midQ = row.get("midQ")
+            quoteSnapshot.symbol = row.get("symbol")
+            quoteSnapshot.totalMatchSize = row.get("totalMatchSize")
+            quoteSnapshot.totalMatchValue = row.get("totalMatchValue")
+            quoteSnapshot.avgMatchPx = row.get("avgMatchPx")
+            quoteSnapshot.size = row.get("size")
+            quoteSnapshot.volume = row.get("volume")
+            quoteSnapshot.lastPx = row.get("lastPx")
+
+            time.sleep(diff)
             marketData_2_exchSim_q.put(quoteSnapshot)
             marketData_2_platform_q.put(quoteSnapshot)
-        '''添加一个EndOfData的信号'''
-        quoteEndOfData = OrderBookSnapshot_FiveLevels(row.ticker+'_EndOfData', now.date(), now.time(),
-                                                      bidPrice=[0, 0, 0, 0, 0],
-                                                      askPrice=[0, 0, 0, 0, 0],
-                                                      bidSize=[0, 0, 0, 0, 0],
-                                                      askSize=[0, 0, 0, 0, 0])
-        marketData_2_platform_q.put(quoteEndOfData)
-        # print(quoteSnapshot.outputAsDataFrame())
+            # print(quoteSnapshot.outputAsDataFrame())
 
 
 # bidPrice, askPrice, bidSize, askSize = [], [], [], []
