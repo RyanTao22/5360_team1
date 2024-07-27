@@ -10,11 +10,20 @@ class OrderManager:
         self.__orders:Mapping[str,SingleStockOrder] = defaultdict(lambda: None)
         self.lock = Lock()
         self.debug = debug
+        self.__exOrderID2OrderID: Mapping[str,str] = defaultdict(lambda: None)
+
+
+    def lookupExOrderID(self,exOrderID,copy=True):
+        orderID = self.__exOrderID2OrderID[exOrderID]
+        if orderID is not None: return self.lookupOrderID(orderID,copy)
+        return None
 
 
     def trackOrder(self,order: SingleStockOrder):
         self.lock.acquire()
-        self.__orders[order.orderID] = order
+        self.__orders[order.orderID] = order.copyOrder()
+        if order.exOrderID is not None:
+            self.__exOrderID2OrderID[order.exOrderID] = order.orderID
         self.lock.release()
 
     def lookupOrderID(self,orderID,copy=True)->SingleStockOrder:
@@ -42,3 +51,15 @@ class OrderManager:
                 """)
             self.lock.release()
 
+    def __str__(self):
+        return f"""
+        OrderManager
+        {"".join([str(order) for _,order in self.__orders.items()])}
+        """
+        # self.lock.acquire()
+        # rep = f"""
+        # OrderManager
+        # {''.join([str(order) for _,order in self.__orders.items()])}
+        # """
+        # self.lock.release()
+        # return rep

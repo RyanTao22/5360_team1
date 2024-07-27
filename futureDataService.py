@@ -317,6 +317,16 @@ class FutureDataService:
                                                             askSize=[row[askSize_cols_list[i]] for i in range(5)],
                                                             bidSize=[row[bidSize_cols_list[i]] for i in range(5)]
                                                          )
+            quoteSnapshot.type = row.get("type")
+            quoteSnapshot.midQ = row.get("midQ")
+            quoteSnapshot.symbol = row.get("symbol")
+            quoteSnapshot.totalMatchSize = row.get("totalMatchSize")
+            quoteSnapshot.totalMatchValue = row.get("totalMatchValue")
+            quoteSnapshot.avgMatchPx = row.get("avgMatchPx")
+            quoteSnapshot.size = row.get("size")
+            quoteSnapshot.volume = row.get("volume")
+            quoteSnapshot.lastPx = row.get("lastPx")
+            
             if not self.backTest: time.sleep(diff)
             futureData_2_exchSim_q.put(quoteSnapshot)
             futureData_2_platform_q.put(quoteSnapshot)

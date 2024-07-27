@@ -158,6 +158,16 @@ class MarketDataService:
                                                          askPrice=row["SP1":"SP5"].tolist(),
                                                          bidSize=row["BV1":"BV5"].tolist(),
                                                          askSize=row["SV1":"SV5"].tolist())
+            quoteSnapshot.type = "both"
+            quoteSnapshot.midQ = row.get("midQ")
+            quoteSnapshot.symbol = row.get("symbol")
+            quoteSnapshot.totalMatchSize = row.get("totalMatchSize")
+            quoteSnapshot.totalMatchValue = row.get("totalMatchValue")
+            quoteSnapshot.avgMatchPx = row.get("avgMatchPx")
+            quoteSnapshot.size = row.get("size")
+            quoteSnapshot.volume = row.get("volume")
+            quoteSnapshot.lastPx = row.get("lastPx")
+                        
             if not self.backTest: time.sleep(diff)
             marketData_2_exchSim_q.put(quoteSnapshot)
             marketData_2_platform_q.put(quoteSnapshot)

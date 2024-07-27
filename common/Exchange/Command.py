@@ -15,17 +15,25 @@ class Command(ABC):
     def execute(self,mgr:OrderBookManager): pass
 
 
-class OverwriteOrderBookCommand(Command):
+class MarketDataCommand(Command):
     def __init__(self, snap: OrderBookSnapshot_FiveLevels):
         self.snap = snap
 
     def execute(self,mgr: OrderBookManager):
         mgr.overwriteOrderBook(self.snap)
-
+        if self.snap.type in ("both"): ###stock
+            mgr.overwriteOrderBook(self.snap)
+            mgr.updateLastTradeSize(self.snap.size)
+            mgr.updateLastTradePrice(self.snap.lastPx)
+        elif self.snap.type in ("quotes"): ###futures quotes data
+            mgr.overwriteOrderBook(self.snap)
+        elif self.snap.type in ("trades"):
+            mgr.updateLastTradeSize(self.snap.totalMatchSize)
+            mgr.updateLastTradePrice(self.snap.totalMatchValue)
 
 class OrderCommand(Command):
     def __init__(self, order: SingleStockOrder):
-        self.order = order
+        self.order = order.copyOrder()
 
     def execute(self,mgr:OrderBookManager):
         if self.order.direction == 1:

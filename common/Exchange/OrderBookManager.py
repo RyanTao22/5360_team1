@@ -58,7 +58,7 @@ class OrderBookManager:
 
     def overwriteOrderBook(self,snap: OrderBookSnapshot_FiveLevels):
         self.__initOrderBook()
-        self.__updateLastTradePrice(None)
+        self.updateLastTradePrice(None)
         now = datetime.now()
         for i in range(1,6):
             ######
@@ -88,7 +88,7 @@ class OrderBookManager:
             self.addToBidQ(buyOrder, dt=now)
 
     def addToBidQ(self, buyOrder: SingleStockOrder, dt):
-        self.__bidQ.put((-1*buyOrder.price, dt, buyOrder))
+        self.__bidQ.put((-buyOrder.price, dt, buyOrder))
 
     def addToAskQ(self, sellOrder:SingleStockOrder, dt):
         self.__askQ.put((sellOrder.price, dt, sellOrder))
@@ -107,6 +107,8 @@ class OrderBookManager:
         if order is not None: order.size = 0
         self.__orders.pop(exOrderID,None)
         self.__stopOrders.pop(exOrderID,None)
+        self.__produceExecution(order,None,None)
+
 
     def isBidQEmpty(self):return self.__bidQ.empty()
 
@@ -150,16 +152,16 @@ class OrderBookManager:
                     """)
                 self.mgr_2_exchSim_q.put(exB1)
                 self.mgr_2_exchSim_q.put(exS1)
-                self.__updateLastTradePrice(tradePrice)
-                self.__updateLastTradeSize(tradeSize)
+                self.updateLastTradePrice(tradePrice)
+                self.updateLastTradeSize(tradeSize)
 
 
             self.clean0SizeOrderFromQ(self.__askQ)
             self.clean0SizeOrderFromQ(self.__bidQ)
 
-    def __updateLastTradeSize(self, tradeSize):
+    def updateLastTradeSize(self, tradeSize):
         self.__lastTradeSize = tradeSize
-    def __updateLastTradePrice(self, tradePrice):
+    def updateLastTradePrice(self, tradePrice):
         self.__lastTradePrice = tradePrice
         # self.checkStopOrderTrigger()
 
@@ -179,6 +181,12 @@ class OrderBookManager:
 
     def getBest(self,pq:PriorityQueue) -> SingleStockOrder:
         return pq.queue[0][2]
+
+    def getTotalAskOrderSize(self):
+        return sum([o.size for _,_,o in self.__askQ.queue])
+
+    def getTotalBidOrderSize(self):
+        return sum([o.size for _,_,o in self.__bidQ.queue])
 
     def getBid1(self) -> SingleStockOrder: return self.getBest(self.__bidQ)
 
@@ -214,3 +222,27 @@ class OrderBookManager:
 
 
 
+    def __str__(self):
+        bidQ_df = pd.DataFrame(self.__bidQ.queue,columns=['priority','time','order']).sort_values(['priority','time'],ascending=[True,True])
+        askQ_df = pd.DataFrame(self.__askQ.queue,columns=['priority','time','order']).sort_values(['priority','time'],ascending=[False,False])
+        bidContent = askContent = ""
+        for _,r in askQ_df.iterrows():
+            order = r['order']
+            ask1Ptr = "<---Ask1" if self.getAsk1().price == order.price else ""
+            askContent += f"""
+            Price=${order.price}:Size={order.size} {ask1Ptr}"""
+        for _,r in bidQ_df.iterrows():
+            order = r['order']
+            bid1Ptr = "<---Bid1" if self.getBid1().price== order.price else ""
+            bidContent += f"""
+            Price=${order.price}:Size={order.size} {bid1Ptr}"""
+        return f"""
+        OrderBookManager
+        Ticker:{self.ticker}
+        lastTradePrice:{self.__lastTradePrice}
+        lastTradeSize:{self.__lastTradeSize}
+        ------------Ask-------------
+        {askContent}
+        ------------Bid-------------
+        {bidContent}
+        """
