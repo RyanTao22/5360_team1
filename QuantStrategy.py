@@ -19,6 +19,11 @@ from common.Strategy import Strategy
 from common.SingleStockOrder import SingleStockOrder
 from common.SingleStockExecution import SingleStockExecution
 from datetime import datetime
+import lightgbm as lgb
+from collections import deque
+from copulae.elliptical import GaussianCopula
+from scipy.stats import rankdata, norm
+
 class QuantStrategy(Strategy):
     
     def __init__(self, stratID, stratName, stratAuthor, ticker, day):
