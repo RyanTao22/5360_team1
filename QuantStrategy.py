@@ -210,10 +210,10 @@ class InDevelopingStrategy(QuantStrategy):
         self.tickers2Snapshots = tickers2Snapshots
         self.orderManager = orderManager
         self.day = day  # public field
-        self.initial_cash = 10000000.0
+        self.initial_cash = initial_cash
         # Create the declarative base
         self.timestamp = []
-        self.cash = [10000000.0]
+        self.cash = [self.initial_cash]
         self.limit_cash = self.initial_cash * 0.05
         self.cashCostRatio = 0.2
         self.networth = [0]
@@ -619,6 +619,7 @@ class InDevelopingStrategy(QuantStrategy):
                 ticker2RecentMarketData = ticker2MarketData_trades[-1]
                 # 更新trade表
                 self.futuredfT.append(ticker2RecentMarketData)
+            
             '''使用更新后的价格计算净值'''
             netWrorth = self.cash[-1]
             if len(self.positions[ticker1]) > 0:
@@ -638,6 +639,7 @@ class InDevelopingStrategy(QuantStrategy):
                 'midPrice_' + ticker1: self.midPrices[ticker1][-1],
                 'midPrice_' + ticker2: self.midPrices[ticker2][-1]
             })
+            
 
             if len(self.stockdf) > 1 and len(self.futuredfQ) > 1 and len(self.futuredfT) > 1:
                 #########do some calculation with the recent market data
@@ -649,6 +651,8 @@ class InDevelopingStrategy(QuantStrategy):
                                          future_dfT)
 
                 order = self.generate_signal(df1, df2, 10)['op']
+                print('order:----------------------------------------------------------------', order)
+                
                 ordersizeStock, ordersizeFutures, direction_stock, direction_futures = 0, 0, 0, 0
                 if order == 1:
                     direction_stock, direction_futures = 1, -1

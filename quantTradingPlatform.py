@@ -14,6 +14,7 @@ from multiprocessing import Queue
 import pandas as pd
 
 from QuantStrategy import QuantStrategy, InDevelopingStrategy
+#from QuantStrategy import QuantStrategy, dummyStrategy
 from uuid import uuid1
 from datetime import datetime
 
