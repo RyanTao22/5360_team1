@@ -31,6 +31,8 @@ class MarketDataService:
         self.stockCodes = stockCodes
         self.playSpeed = playSpeed
         self.backTest = backTest
+        self.marketData_2_exchSim_q = marketData_2_exchSim_q
+        self.marketData_2_platform_q = marketData_2_platform_q
 
         print("[%d]<<<<< call MarketDataService.init" % (os.getpid(),))
         # time.sleep(3)
@@ -46,12 +48,12 @@ class MarketDataService:
         print("[%d]<<<<< call MarketDataService.calculateTimestampDiff" % (os.getpid(),))
         self.calculateTimestampDiff()
 
-        if isReady is not None:
-            while isReady.value==0:
-                print("sleep for 3 secs")
-                time.sleep(3)
+        # if isReady is not None:
+        #     while isReady.value==0:
+        #         print("sleep for 3 secs")
+        #         time.sleep(3)
 
-        self.produce_quote(marketData_2_exchSim_q, marketData_2_platform_q)
+        # self.produce_quote(marketData_2_exchSim_q, marketData_2_platform_q)
 
 
     def unzipFile(self):

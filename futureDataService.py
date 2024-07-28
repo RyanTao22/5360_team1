@@ -40,6 +40,8 @@ class FutureDataService:
         self.futureCodes = futuresCodes
         self.playSpeed = playSpeed
         self.backTest = backTest
+        self.futureData_2_exchSim_q = futureData_2_exchSim_q
+        self.futureData_2_platform_q = futureData_2_platform_q
 
         print("[%d]<<<<< call FutureDataService.init" % (os.getpid(),))
         #time.sleep(3) #let marketDataService to unzip first
@@ -69,12 +71,12 @@ class FutureDataService:
         self.calculateTimestampDiff()
 
 
-        if isReady is not None:
-            while isReady.value==0:
-                print("sleep for 3 secs")
-                time.sleep(3)
-
-        self.produce_future(futureData_2_exchSim_q, futureData_2_platform_q)
+        # if isReady is not None:
+        #     while isReady.value==0:
+        #         print("sleep for 3 secs")
+        #         time.sleep(3)
+        #
+        # self.produce_future(futureData_2_exchSim_q, futureData_2_platform_q)
 
 
 
