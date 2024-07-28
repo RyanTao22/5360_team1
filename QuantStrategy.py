@@ -5,7 +5,7 @@ Created on Thu Jun 20 10:26:05 2020
 
 @author: hongsong chou
 """
-import datetime
+
 import os
 import time
 from typing import Mapping
@@ -18,7 +18,7 @@ from common.Platform.OrderManager import OrderManager
 from common.Strategy import Strategy
 from common.SingleStockOrder import SingleStockOrder
 from common.SingleStockExecution import SingleStockExecution
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import lightgbm as lgb
 from collections import deque
@@ -203,9 +203,9 @@ class SampleDummyStrategy(QuantStrategy):
 
 
 class InDevelopingStrategy(QuantStrategy):
-    def __init__(self, stratID, stratName, stratAuthor, ticker, day,
+    def __init__(self, stratID, stratName, stratAuthor, day, ticker,
                  tickers2Snapshots: Mapping[str,OrderBookSnapshot_FiveLevels],
-                 orderManager:OrderManager):
+                 orderManager:OrderManager, initial_cash, analysis_queue):
         super().__init__(stratID,stratName,stratAuthor,ticker,day)
         self.tickers2Snapshots = tickers2Snapshots
         self.orderManager = orderManager
@@ -227,16 +227,32 @@ class InDevelopingStrategy(QuantStrategy):
         self.orderFIdx = 0
         self.lastdirection1 = 0
         self.lastdirection2 = 0
-        self.stockdf = []
-        self.futuredfQ = []
-        self.futuredfT = []
+        self.stockdf = [pd.DataFrame()]
+        self.futuredfQ = [pd.DataFrame()]
+        self.futuredfT = [pd.DataFrame()]
         '''记录所有发出的订单'''
         self.submitted_order = [] #(ordertime, orderid, orderprice, ordersize, direction)
         '''记录未成交或者成交后有残余的订单'''
         self.untreated_order = [] #(ordertime, orderid, orderprice, ordersize, direction)
+
+        self.analysis_q = analysis_queue
+        self.execution_record = []
+        
+        self.positions = {self.ticker[0]:[0], self.ticker[1]: [0]}
+        self.cash = [initial_cash]
+        self.networth = [initial_cash]
+        self.midPrices = {self.ticker[0]:[0], self.ticker[1]: [0]}
+
+        # self.baseline_cash = initial_cash
+        # self.baseline_networth = initial_cash
+        # self.baseline_positions = {}
+    
+        self.timestamp = []
+
+
     def gain_timeindex(self, start_time, end_time):
         '''获取分钟级别时间间隔'''
-        time_interval = datetime.timedelta(minutes=1)
+        time_interval = timedelta(minutes=1)
         time_data = []
         current_time = start_time
         while current_time <= end_time:
@@ -249,18 +265,18 @@ class InDevelopingStrategy(QuantStrategy):
         year = int(date[:4])
         month = int(date[5:7])
         day = int(date[8:10])
-        hour = time // 10000000
-        minute = (time // 100000) % 100
-        second = (time // 1000) % 100
-        dt = datetime.datetime(year, month, day, hour, minute, second)
+        hour = time.hour
+        minute = time.minute
+        second = time.second
+        dt = datetime(year, month, day, hour, minute, second)
         return dt
 
     def stock_dataprocess(self, rawStock):
         '''处理股票数据'''
         df = rawStock.copy()
         df = df.reset_index(drop=True)
-        start_time = self.gain_datetime(df['time'][0])
-        end_time = self.gain_datetime(df['time'][-1])
+        start_time = self.gain_datetime(df['time'].iloc[0])
+        end_time = self.gain_datetime(df['time'].iloc[-1])
         time_data = self.gain_timeindex(start_time, end_time)
 
         df['time_trans'] = df['time'].astype('str').str.zfill(9).apply(lambda x: x[:2] + ':' + x[2:4])
@@ -272,8 +288,25 @@ class InDevelopingStrategy(QuantStrategy):
         df_min['close'] = grouped['lastPx'].last()
         df_min['open'] = grouped['lastPx'].first()
 
-        cols = ['date', 'volume', 'SP5', 'SP4', 'SP3', 'SP2', 'SP1', 'BP1', 'BP2', 'BP3', 'BP4', 'BP5', 'SV5', 'SV4',
-                'SV3', 'SV2', 'SV1', 'BV1', 'BV2', 'BV3', 'BV4', 'BV5']
+        # cols = ['date', 'volume', \
+        #         'SP5', 'SP4', 'SP3', 'SP2', 'SP1',\
+        #         'BP1', 'BP2', 'BP3', 'BP4', 'BP5', \
+        #         'SV5', 'SV4','SV3', 'SV2', 'SV1',\
+        #         'BV1', 'BV2', 'BV3', 'BV4', 'BV5']
+        # cols = ['ticker','date',"volume"
+        #           'askPrice5','askPrice4','askPrice3','askPrice2','askPrice1', \
+        #           'bidPrice1','bidPrice2','bidPrice3','bidPrice4','bidPrice5', \
+        #           'askSize5','askSize4','askSize3','askSize2','askSize1', \
+        #           'bidSize1','bidSize2','bidSize3','bidSize4','bidSize5',\
+        #           "type","midQ","symbol","totalMatchSize","totalMatchValue",\
+        #           "initializationFlag","avgMatchPx","size",,"lastPx",]
+
+        cols = ['date',"volume",
+                  'askPrice5','askPrice4','askPrice3','askPrice2','askPrice1', \
+                  'bidPrice1','bidPrice2','bidPrice3','bidPrice4','bidPrice5', \
+                  'askSize5','askSize4','askSize3','askSize2','askSize1', \
+                  'bidSize1','bidSize2','bidSize3','bidSize4','bidSize5']
+
 
         for col in cols:
             df_min[col] = grouped[col].last()
@@ -287,6 +320,7 @@ class InDevelopingStrategy(QuantStrategy):
         # 盘口数据
         df_Quotes = rawFutureQ.copy()
         df_Quotes = df_Quotes.reset_index(drop=True)
+        #print(df_Quotes)
         start_time = self.gain_datetime(df_Quotes['time'][0])
         end_time = self.gain_datetime(df_Quotes['time'][-1])
         time_data_ft = self.gain_timeindex(start_time, end_time)
@@ -542,9 +576,15 @@ class InDevelopingStrategy(QuantStrategy):
         flag = 0
         if execution is None:  #######on receive market data
             ####get most recent market data for ticker
-            ticker1MarketData: list[pd.DataFrame] = self.tickers2Snapshots[ticker1]
-            ticker2MarketDataQ: list[pd.DataFrame] = self.tickers2Snapshots[ticker2]['futures_quotes']
-            ticker2MarketDataT: list[pd.DataFrame] = self.tickers2Snapshots[ticker2]['futures_trades']
+
+            ticker1MarketData:list[pd.DataFrame] = self.tickers2Snapshots['stocks'][ticker1]
+            ticker2MarketData:list[pd.DataFrame] = self.tickers2Snapshots['futures_quotes'][ticker2]
+            ticker2MarketData_trades:list[pd.DataFrame] = self.tickers2Snapshots['futures_trades'][ticker2]
+
+            ticker1RecentMarketData = None
+            ticker2RecentMarketData = None
+            ticker2RecentMarketData_trades = None
+
 
             if len(ticker1MarketData) > 0:
                 flag += 1
@@ -560,9 +600,9 @@ class InDevelopingStrategy(QuantStrategy):
                 # 将新信息存储到历史表列表中
                 self.stockdf.append(ticker1RecentMarketData)
 
-            if len(ticker2MarketDataQ) > 0:
+            if len(ticker2MarketData) > 0:
                 flag += 1
-                ticker2RecentMarketData = ticker2MarketDataQ[-1]
+                ticker2RecentMarketData = ticker2MarketData[-1]
                 '''更新价格2'''
                 self.midPrices[ticker2].append(
                     (ticker2RecentMarketData['bidPrice1'] + ticker2RecentMarketData['askPrice1']) / 2)
@@ -574,9 +614,9 @@ class InDevelopingStrategy(QuantStrategy):
                 # self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'] + ticker2RecentMarketData['time']))
                 self.futuredfQ.append(ticker2RecentMarketData)
 
-            if len(ticker2MarketDataT) > 0:
+            if len(ticker2MarketData_trades) > 0:
                 flag += 1
-                ticker2RecentMarketData = ticker2MarketDataT[-1]
+                ticker2RecentMarketData = ticker2MarketData_trades[-1]
                 # 更新trade表
                 self.futuredfT.append(ticker2RecentMarketData)
             '''使用更新后的价格计算净值'''
@@ -599,12 +639,12 @@ class InDevelopingStrategy(QuantStrategy):
                 'midPrice_' + ticker2: self.midPrices[ticker2][-1]
             })
 
-            if flag >= 1:
+            if len(self.stockdf) > 1 and len(self.futuredfQ) > 1 and len(self.futuredfT) > 1:
                 #########do some calculation with the recent market data
                 # .....
-                stock_df = pd.cancat(self.stockdf)
-                future_dfQ = pd.cancat(self.futuredfQ)
-                future_dfT = pd.cancat(self.futuredfT)
+                stock_df = pd.concat(self.stockdf)
+                future_dfQ = pd.concat(self.futuredfQ) 
+                future_dfT = pd.concat(self.futuredfT)
                 df1, df2 = self.get_data(stock_df, future_dfQ,
                                          future_dfT)
 
