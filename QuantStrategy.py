@@ -23,6 +23,9 @@ import numpy as np
 import lightgbm as lgb
 from collections import deque
 from copulae.elliptical import GaussianCopula
+from copulae.archimedean import ClaytonCopula,GumbelCopula,FrankCopula
+from sklearn.linear_model import LinearRegression
+from scipy.integrate import quad
 from scipy.stats import rankdata, norm
 
 class QuantStrategy(Strategy):
@@ -224,6 +227,9 @@ class InDevelopingStrategy(QuantStrategy):
         self.orderFIdx = 0
         self.lastdirection1 = 0
         self.lastdirection2 = 0
+        self.stockdf = []
+        self.futuredfQ = []
+        self.futuredfT = []
         '''记录所有发出的订单'''
         self.submitted_order = [] #(ordertime, orderid, orderprice, ordersize, direction)
         '''记录未成交或者成交后有残余的订单'''
@@ -324,72 +330,211 @@ class InDevelopingStrategy(QuantStrategy):
         processedDataStock = self.stock_dataprocess(stockdf)
         processedDataFuture = self.future_dataprocess(futuredfQ, futuredfT)
         return processedDataStock, processedDataFuture
-    def generate_signal(self, df_stock, df_future, past_step, col='return_5'):
+    def generate_signal_copula(self, df_stock, df_future, past_step, valid_min, trust_prob=0.7, op_last=None, base='future'):
 
-        '''生成策略相关信号
-        每个分钟开始时回看past_step个分钟，假设传入一天的数据，输出一整天的分钟频信号。
-        每次只传入一对股票期货对'''
+        '''
+        生成策略相关信号,每个tick开始时回看past_step个分钟,每次只传入一对股票期货对
+        Input
+            past_step: 回看分钟数
+            valid_min: 信号有效时长（信号频率）
+            trust_prob：概率阈值
+            op_last: 最新的一次操作
+            base: 基于哪一个标的的条件概率
+        Output
+            op
+            1: Buy stock, sell future
+            0: No act
+            -1: Sell stock, buy future
+            2: Close all positions
+        '''
+
         if len(df_stock) < past_step or len(df_future) < past_step:
             return
-        df_stock['return'] = np.log(1 + df_stock['close'].pct_change())
-        df_stock['return_5'] = np.log(1 + df_stock['close'].pct_change(periods=5))
-        df_stock['return_10'] = np.log(1 + df_stock['close'].pct_change(periods=10))
-        df_future['return'] = np.log(1 + df_future['avgMatchPx'].pct_change())
-        df_future['return_5'] = np.log(1 + df_future['avgMatchPx'].pct_change(periods=5))
-        df_future['return_10'] = np.log(1 + df_future['avgMatchPx'].pct_change(periods=10))
-
-        return_df = pd.merge(df_stock[['time', col]], df_future[['time', col]], on='time', how='inner')
+        
+        df_stock[f'return_{valid_min}_stock'] = np.log(1 + df_stock['close'].pct_change(periods=valid_min))
+        df_future[f'return_{valid_min}_future'] = np.log(1 + df_future['avgMatchPx'].pct_change(periods=valid_min))
+        return_df = pd.merge(df_stock[['time',f'return_{valid_min}_stock']], df_future[['time',f'return_{valid_min}_future']], on='time', how='inner')
         return_df = return_df.dropna().reset_index(drop=True)
+        
+        op_lis = []
+        sign_record = []
 
-        signal = []
-        time = return_df['time'][-1]
-            # print(time)
-        returns_1 = return_df[col + '_x'][-past_step:]
-        returns_2 = return_df[col + '_y'][-past_step:]
-        u1 = rankdata(returns_1) / (len(returns_1) + 1)
-        u2 = rankdata(returns_2) / (len(returns_2) + 1)
-        u = np.vstack((u1, u2)).T
-            # print(u)
-        cop = GaussianCopula(dim=2)
-        cop.fit(u)
+        time = return_df['time'].iloc[-1]
 
-        # 假设我们有未来的预测值,这里直接用最近的一个收益率值
-        ######## 可以替换成机器学习 ##########
-        future_return_1 = return_df[col + '_x'][-1]  # 未来预测的资产1的对数收益率
-        future_return_2 = return_df[col + '_y'][-1]  # 未来预测的资产2的对数收益率
+        if int(time[-2:])%valid_min != 0:
+            return
 
-         # 将未来的预测值转换为均匀分布
-        future_u1 = norm.cdf(future_return_1, np.mean(returns_1), np.std(returns_1))
-        future_u2 = norm.cdf(future_return_2, np.mean(returns_2), np.std(returns_2))
+        ret_stock = return_df[f'return_{valid_min}_stock'][-past_step:]
+        ret_future = return_df[f'return_{valid_min}_future'][-past_step:]
 
-        # 计算Copula CDF值
-        cop_cdf = cop.cdf([future_u1, future_u2])
+        Ustock = norm.cdf(ret_stock, np.mean(ret_stock), np.std(ret_stock))
+        Ufuture = norm.cdf(ret_future, np.mean(ret_future), np.std(ret_future))
+        u = np.vstack((Ustock, Ufuture)).T
 
-        # 计算边缘分布的概率
-        marginal_u1 = norm.cdf(future_return_1, np.mean(returns_1), np.std(returns_1))
-        marginal_u2 = norm.cdf(future_return_2, np.mean(returns_2), np.std(returns_2))
+        cop1 = GaussianCopula(dim=2)
+        cop2 = ClaytonCopula(dim=2)
+        cop3 = GumbelCopula(dim=2)
+        cop4 = FrankCopula(dim=2)
 
-        # 计算条件概率
-        conditional_u1_given_u2 = cop_cdf / marginal_u2
-        conditional_u2_given_u1 = cop_cdf / marginal_u1
+        cop1.fit(u, method='ml')
+        cop2.fit(u, method='ml')
+        cop3.fit(u, method='ml')
+        cop4.fit(u, method='ml')
 
-        # 基于条件概率生成交易信号
-        threshold = 0.5  # 假设一个阈值
-        # buy_signal: buy u1, and sell u2
-        sell_signal_u1 = conditional_u1_given_u2 > threshold
-        buy_signal_u1 = conditional_u1_given_u2 < (1 - threshold)
-        buy_signal_u2 = conditional_u2_given_u1 > threshold
-        sell_signal_u2 = conditional_u2_given_u1 < (1 - threshold)
+        loglik_lis = [cop1.log_lik(u),cop2.log_lik(u),cop3.log_lik(u),cop4.log_lik(u)]
+        max_id = loglik_lis.index(max(loglik_lis))
+        cop = [cop1,cop2,cop3,cop4][max_id]
 
-        signal.append({"time": time,
-                           "Buy Signal based on U1:": buy_signal_u1,
-                           "Sell Signal based on U1": sell_signal_u1,
-                           "Buy Signal based on U2": buy_signal_u2,
-                           "Sell Signal based on U2": sell_signal_u2
-                           })
+        ret_stock_pred = return_df[f'return_{valid_min}_stock'].iloc[-1] 
+        ret_future_pred = return_df[f'return_{valid_min}_future'].iloc[-1]  
 
-        signal_df = pd.DataFrame(signal)
-        return signal_df
+        Ustock_pred = norm.cdf(ret_stock_pred, np.mean(ret_stock), np.std(ret_stock))
+        Ufuture_pred = norm.cdf(ret_future_pred, np.mean(ret_future), np.std(ret_future))
+
+        def condition(t,upper_bound):
+            return 1 if t < upper_bound else 0
+        def gain_sign(base):
+            if base == 'future':
+                numerator, _ = quad(lambda t: cop.pdf([t, Ufuture_pred]) * condition(t,Ufuture_pred), 0, Ufuture_pred)
+                sign = numerator
+            elif base == 'stock':
+                numerator, _ = quad(lambda t: cop.pdf([Ustock_pred,t]) * condition(t,Ustock_pred), 0, Ustock_pred)
+                sign = numerator
+            
+            return sign
+
+        # ticker1 = self.ticker[0]
+        # ticker2 = self.ticker[1]
+        # stockPosition = self.position[ticker1][-1]
+        # futurePosition = self.position[ticker2][-1]
+
+        # if base == 'future':
+        #     stockPosition
+
+
+        if base == 'future':
+            if op_last is None:
+                op = 1 if gain_sign(base) < 1-trust_prob else -1 if gain_sign(base) > trust_prob else 0
+                op_last = op
+            else:
+
+                op = 1 if gain_sign(base) < 1-trust_prob else -1 if gain_sign(base) > trust_prob else 0
+                
+                if op != 0 and op == op_last: 
+                    op = 0
+                elif op == 0 and op != op_last: 
+                    op = 2 # close
+                    op_last = 0
+                else:
+                    op_last = op
+
+        elif base == 'stock':
+            if op_last is None:
+                op = -1 if gain_sign(base) < 1-trust_prob else 1 if gain_sign(base) > trust_prob else 0
+                op_last = op
+            else:
+                op = -1 if gain_sign(base) < 1-trust_prob else 1 if gain_sign(base) > trust_prob else 0
+                
+                if op != 0 and op == op_last: 
+                    op = 0
+                elif op == 0 and op != op_last: 
+                    op = 2 # close
+                    op_last = 0
+                else:
+                    op_last = op
+
+        sign_record.append({"time":time,"sign":gain_sign(base)})
+        op_lis.append({"time":time,"op":op})
+        op_df = pd.DataFrame(op_lis)
+
+        return op_df, op_last
+    
+
+    def generate_signal_cointegration(self, df_stock, df_future, past_step, smooth_min, bounds=[1,2], op_last=None):
+
+        '''
+        生成策略相关信号,每个tick开始时回看past_step个分钟,每次只传入一对股票期货对
+        Input
+            past_step: 回看分钟数
+            smooth_min: 平滑分钟数
+            op_last: 最新的一次操作
+            bounds: 协整法判断的两个值域
+        Output
+            op
+            1: Buy stock, sell future
+            0: No act
+            -1: Sell stock, buy future
+            2: Close all positions
+        '''
+        """
+        op
+            1: Buy stock, sell future
+            0: No act
+            -1: Sell stock, buy future
+            2: Close all positions when mean reversion
+            4: Forced closing
+        """
+
+        if len(df_stock) < past_step or len(df_future) < past_step:
+            return
+
+        lower_bound = bounds[0]
+        upper_bound = bounds[1]
+
+
+        df_stock['lnP_stock'] = np.log(df_stock['close'])
+        df_future['lnP_future'] = np.log(df_future['avgMatchPx'].ffill())
+
+        df_stock[f'lnP_ma{smooth_min}_stock'] = df_stock['lnP_stock'].rolling(smooth_min).mean()
+        df_future[f'lnP_ma{smooth_min}_future'] = df_future['lnP_future'].rolling(smooth_min).mean()
+
+        df_price = pd.merge(df_stock[['time', f'lnP_ma{smooth_min}_stock']], df_future[['time',f'lnP_ma{smooth_min}_future']], on='time', how='inner')
+        df_price = df_price.dropna().reset_index(drop=True)
+
+        op = []
+        sign_record = []
+        time = df_price['time'].iloc[-1]
+        model = LinearRegression()
+        x = [x for x in df_price[-past_step:][f'lnP_ma{smooth_min}_future']]
+        X = [[k] for k in x]
+        y = [ y for y in df_price[-past_step:][f'lnP_ma{smooth_min}_stock']]
+
+        model.fit(X, y)
+        y_pred = model.predict(X)
+        resids = y - y_pred
+        resid_std = np.std(resids)
+        sign = resids[-1]/resid_std
+
+        if op_last is None:     
+            sign_record.append({"time":time,"sign":sign})
+            op.append({"time":time,"op":0})
+            op_last = 0
+        else:
+            sign_last = sign_record[-1]['sign']
+            if sign_last > lower_bound and sign <= lower_bound and sign > 0:
+                op.append({"time":time,"op":1})
+                op_last = 1
+
+            elif sign_last < -lower_bound and sign >= -lower_bound and sign < 0:
+                op.append({"time":time,"op":-1})
+                op_last = -1
+            
+            elif abs(op_last)==1 and abs(sign) >= upper_bound:
+                op.append({"time":time,"op":4})
+                op_last = 0
+            
+            elif abs(op_last)==1 and sign*sign_last<0:
+                op.append({"time":time,"op":2})
+                op_last = 0
+            else:
+                op.append({"time":time,"op":0})
+            
+            sign_record.append({"time":time,"sign":sign})
+                    
+        sign_record = pd.DataFrame(sign_record)
+        op = pd.DataFrame(op)
+        return op, op_last
+
 
     def run(self, execution: SingleStockExecution) -> list[SingleStockOrder]:
         ticker1 = self.ticker[0]
@@ -463,32 +608,56 @@ class InDevelopingStrategy(QuantStrategy):
                 df1, df2 = self.get_data(stock_df, future_dfQ,
                                          future_dfT)
 
-                orders = self.generate_signal(df1, df2, 10)
-                direction_stock = 1 if orders.iloc[:, 1].item() == 1 else -1 if orders.iloc[:, 2].item() == 1 else 0
-                direction_futures = 1 if orders.iloc[:, 3].item() == 1 else -1 if orders.iloc[:, 4].item() == 1 else 0
-                if self.cash[-1] <= self.limit_cash:
+                order = self.generate_signal(df1, df2, 10)['op']
+                ordersizeStock, ordersizeFutures, direction_stock, direction_futures = 0, 0, 0, 0
+                if order == 1:
+                    direction_stock, direction_futures = 1, -1
+                elif order == -1:
+                    direction_stock, direction_futures = -1, 1
+                elif order == 0:
+                    return []
+                elif order == 2:
+                    '''强制平仓'''
+                    stockPosition = self.position[ticker1][-1]
+                    futurePosition = self.position[ticker2][-1]
+                    #如果本来就是空仓，直接返回
+                    if stockPosition == 0 and futurePosition == 0:
+                        return []
+                    if stockPosition != 0:
+                        ordersizeStock = abs(stockPosition)
+                        direction_stock = -np.sign(stockPosition)
+                    if futurePosition != 0:
+                        ordersizeFutures = abs(futurePosition)
+                        direction_futures = -np.sign(futurePosition)
+
+                if self.cash[-1] <= self.limit_cash and order != 2:
                     print('cash is not enough')
                     cash_stock = 0
                     cash_future = 0
+                    return []
                 else:
                     cash_stock = self.cash[-1] * self.cashCostRatio // 2
                     cash_future = self.cash[-1] * self.cashCostRatio // 2
                 if direction_stock > 0:
-                    ordersizeStock = cash_stock // ticker1RecentMarketData['AskPrice1']
-                    odprice = ticker1RecentMarketData['AskPrice1']
+                    if ordersizeStock == 0:
+                        ordersizeStock = cash_stock // stock_df.iloc[-1,]['askPrice1']
+                    odprice = stock_df.iloc[-1,]['askPrice1']
                 elif direction_stock < 0:
-                    ordersizeStock = cash_stock // ticker1RecentMarketData['BidPrice1']
-                    odprice = ticker1RecentMarketData['BidPrice1']
+                    if ordersizeStock == 0:
+                        ordersizeStock = cash_stock // stock_df.iloc[-1,]['bidPrice1']
+                    odprice = stock_df.iloc[-1,]['bidPrice1']
                 else:
                     ordersizeStock = 0
                     odprice = 0
 
                 if direction_futures > 0:
-                    ordersizeFutures = cash_stock // ticker2MarketDataQ['AskPrice1']
-                    odpriceF = ticker2MarketDataQ['AskPrice1']
+                    if ordersizeFutures == 0:
+                        ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['askPrice1']
+                    odpriceF = future_dfQ.iloc[-1,]['askPrice1']
                 elif direction_futures < 0:
-                    ordersizeFutures = cash_stock // ticker2MarketDataQ
-                    odpriceF = ticker2MarketDataQ
+                    if ordersizeFutures == 0:
+                        ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['bidPrice1']
+                    odpriceF = future_dfQ.iloc[-1,]['bidPrice1']
                 else:
                     ordersizeFutures = 0
                     odpriceF = 0
@@ -520,7 +689,6 @@ class InDevelopingStrategy(QuantStrategy):
                 sampleOrder2.currStatusTime = now.time()
                 sampleOrder2.direction = direction_futures  ###1 = buy; -1 = sell
                 sampleOrder2.size = ordersizeFutures
-                sampleOrder2.price = ticker2RecentMarketData['bidPrice5'].item()
                 sampleOrder2.stratID = self.getStratID()
 
                 self.submitted_order.append(sampleOrder1.orderID)
@@ -588,3 +756,4 @@ class InDevelopingStrategy(QuantStrategy):
             return cancelOrders
 
         return []
+

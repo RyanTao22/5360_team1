@@ -13,7 +13,7 @@ from multiprocessing import Queue
 
 import pandas as pd
 
-from QuantStrategy import QuantStrategy, SampleDummyStrategy
+from QuantStrategy import QuantStrategy, InDevelopingStrategy
 from uuid import uuid1
 from datetime import datetime
 
@@ -68,7 +68,7 @@ class TradingPlatform:
         self.stockCodes = stockCodes
         self.futuresCodes = futuresCodes
         ######init strat
-        strat = SampleDummyStrategy(
+        strat = InDevelopingStrategy(
             stratID="dummy1",stratName="dummy1",stratAuthor="hongsongchou",day="20230706",
             ticker=["2610","NEF1"],tickers2Snapshots=self.tickers2Snapshots,
             orderManager=self.orderManager,
