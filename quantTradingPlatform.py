@@ -50,8 +50,8 @@ class TradingPlatform:
         self.recentUpeateTimestamp = None
         self.isReady = isReady
         self.debug = debug
-        # self.stockCodes = stockCodes = MarketDataServiceConfig.stockCodes
-        # self.futuresCodes = futuresCodes = MarketDataServiceConfig.futureCodes
+        self.stockCodes = stockCodes = MarketDataServiceConfig.stockCodes
+        self.futuresCodes = futuresCodes = MarketDataServiceConfig.futureCodes
         self.qMapping:Mapping[str,Queue] = {stock:platform_2_exchSim_order_q for stock in stockCodes}
         self.qMapping.update({futures:platform_2_futuresExchSim_order_q for futures in futuresCodes})
 
@@ -136,13 +136,6 @@ class TradingPlatform:
             res:OrderBookSnapshot_FiveLevels = marketData_2_platform_q.get()
             # print('[%d] Platform.on_md' % (os.getpid()))
             # print(res.outputAsDataFrame())
-            if self.recentUpeateTimestamp is None:
-                self.recentUpeateTimestamp = res.timestamp
-            else:
-                if res.timestamp < self.recentUpeateTimestamp:
-                    print(f"res.timestamp={res.timestamp} < self.recentUpeateTimestamp={self.recentUpeateTimestamp}")
-                    continue
-                self.recentUpeateTimestamp = res.timestamp
 
             
             '''判断数据是否都更新完成'''
