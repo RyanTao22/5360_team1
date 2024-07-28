@@ -35,3 +35,13 @@ class SingleStockExecution():
         output.append(self.order)
 
         return output
+
+    def __str__(self):
+        return f"""
+        SingleStockExecution
+        executionID:{self.execID}
+        orderID:{self.orderID}        
+        exOrderID:{self.exOrderID}
+        direction:{self.direction}
+        price:{self.price}
+        size:{self.size}"""

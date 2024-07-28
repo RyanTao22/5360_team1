@@ -94,11 +94,11 @@ def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSp
         processes.append(Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, isReady)))
         processes.append(Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)))
     elif stockCodes == []:
-        processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, futureData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
+        processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
         processes.append(Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)))
     else:
         processes.append(Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, isReady)))
-        processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, futureData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
+        processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
         processes.append(Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)))
         processes.append(Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)))
 
@@ -139,15 +139,15 @@ def back_test_analysis():
             dcc.Input(id='end_date', value='20240628', type='text', style={'margin-bottom': '10px'}),
             html.Label('Start Time', style={'font-weight': 'bold'}),
             # should be int
-            dcc.Input(id='start_time', value=132315869, type='number', style={'margin-bottom': '10px'}),
+            dcc.Input(id='start_time', value=132015869, type='number', style={'margin-bottom': '10px'}),
             html.Label('Initial Cash', style={'font-weight': 'bold'}),
             dcc.Input(id='initial_cash', value=1000000, type='number', style={'margin-bottom': '10px'}),
             html.Label('Play Speed', style={'font-weight': 'bold'}),
-            dcc.Input(id='play_speed', value=10000000, type='number', style={'margin-bottom': '10px'}),
+            dcc.Input(id='play_speed', value=1000000, type='number', style={'margin-bottom': '10px'}),
             html.Label('ticker1', style={'font-weight': 'bold'}),
             dcc.Input(id='ticker1', value='2610', type='text', style={'margin-bottom': '10px'}),
             html.Label('ticker2', style={'font-weight': 'bold'}),
-            dcc.Input(id='ticker2', value='3374', type='text', style={'margin-bottom': '10px'}),
+            dcc.Input(id='ticker2', value='NEF1', type='text', style={'margin-bottom': '10px'}),
             html.Button('Run Backtest', id='run_backtest', n_clicks=0, style={'background-color': '#4CAF50', 'color': 'white', 'padding': '10px', 'border': 'none', 'cursor': 'pointer', 'font-weight': 'bold', 'float': 'right'}),
 
             # todo: BackTest按钮

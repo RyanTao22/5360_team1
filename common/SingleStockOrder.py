@@ -58,3 +58,18 @@ class SingleStockOrder():
         returnOrder = deepcopy(self)
         return returnOrder
 
+    def __str__(self):
+        return f"""
+        SingleStockOrder
+        Ticker:{self.ticker}
+        orderID:{self.orderID}
+        exOrderID:{self.exOrderID}
+        type:{self.type}
+        currStatus:{self.currStatus}
+        direction:{self.direction}
+        price:{self.price}
+        size:{self.size}
+        filledSize:{self.filledSize}
+        stratID:{self.stratID}
+        """
+

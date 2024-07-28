@@ -13,14 +13,24 @@ class OrderBookSnapshot_FiveLevels(OrderBookSnapshot):
     askPrice1, askPrice2, askPrice3, askPrice4, askPrice5 = None, None, None, None, None
     bidSize1, bidSize2, bidSize3, bidSize4, bidSize5 = None, None, None, None, None
     askSize1, askSize2, askSize3, askSize4, askSize5 = None, None, None, None, None
-    
+    type = None #quotes,trades,both
+    midQ = None
+    symbol = None
+    totalMatchSize = None
+    totalMatchValue = None
     initializationFlag = False
+    avgMatchPx = None
+    size = None
+    volume = None
+    lastPx = None
     
     outputCols = ['ticker','date','time', \
                   'askPrice5','askPrice4','askPrice3','askPrice2','askPrice1', \
                   'bidPrice1','bidPrice2','bidPrice3','bidPrice4','bidPrice5', \
                   'askSize5','askSize4','askSize3','askSize2','askSize1', \
-                  'bidSize1','bidSize2','bidSize3','bidSize4','bidSize5']
+                  'bidSize1','bidSize2','bidSize3','bidSize4','bidSize5',\
+                  "type","midQ","symbol","totalMatchSize","totalMatchValue",\
+                  "initializationFlag","avgMatchPx","size","volume","lastPx",]
 
     def __init__(self, ticker, date, timeStamp, bidPrice, askPrice, bidSize, askSize):
         super().__init__(ticker, date, timeStamp)
@@ -71,6 +81,17 @@ class OrderBookSnapshot_FiveLevels(OrderBookSnapshot):
             outputLine.append(self.bidSize3)
             outputLine.append(self.bidSize4)
             outputLine.append(self.bidSize5)
+            outputLine.append(self.type)
+            outputLine.append(self.midQ)
+            outputLine.append(self.symbol)
+            outputLine.append(self.totalMatchSize)
+            outputLine.append(self.totalMatchValue)
+            outputLine.append(self.initializationFlag)
+            outputLine.append(self.avgMatchPx)
+            outputLine.append(self.size)
+            outputLine.append(self.volume)
+            outputLine.append(self.lastPx)
+
             oneLine = pd.DataFrame(data = [outputLine], columns = self.outputCols)
             
             return oneLine

@@ -12,13 +12,14 @@ from typing import Mapping
 from uuid import uuid1
 
 import pandas as pd
-import numpy as np
+
 from common.OrderBookSnapshot_FiveLevels import OrderBookSnapshot_FiveLevels
 from common.Platform.OrderManager import OrderManager
 from common.Strategy import Strategy
 from common.SingleStockOrder import SingleStockOrder
 from common.SingleStockExecution import SingleStockExecution
 from datetime import datetime
+import numpy as np
 import lightgbm as lgb
 from collections import deque
 from copulae.elliptical import GaussianCopula
@@ -47,7 +48,7 @@ class QuantStrategy(Strategy):
             return SingleStockOrder('testTicker','2019-07-05',time.asctime(time.localtime(time.time())))
         else:
             return None
-        
+                
 
 class SampleDummyStrategy(QuantStrategy):
     def __init__(self, stratID, stratName, stratAuthor, day, ticker,
@@ -72,19 +73,21 @@ class SampleDummyStrategy(QuantStrategy):
         self.timestamp = []
 
     def run(self,execution:SingleStockExecution)->list[SingleStockOrder]:
-        ticker1 = self.ticker[0]
-        ticker2 = self.ticker[1]
+        ticker1 = "2610"
+        ticker2 = "NEF1"
         if execution is None:#######on receive market data
             ####get most recent market data for ticker
-            
-            ticker1MarketData:list[pd.DataFrame] = self.tickers2Snapshots[ticker1]
-            ticker2MarketData:list[pd.DataFrame] = self.tickers2Snapshots[ticker2]
+
+            ticker1MarketData:list[pd.DataFrame] = self.tickers2Snapshots['stocks'][ticker1]
+            ticker2MarketData:list[pd.DataFrame] = self.tickers2Snapshots['futures_quotes'][ticker2]
+            ticker2MarketData_trades:list[pd.DataFrame] = self.tickers2Snapshots['futures_trades'][ticker2]
+
             ticker1RecentMarketData = None
             ticker2RecentMarketData = None
-
+            ticker2RecentMarketData_trades = None
 
             if len(ticker1MarketData) > 0:
-                
+
                 ticker1RecentMarketData = ticker1MarketData[-1]
                 '''更新价格1'''
                 self.midPrices[ticker1].append((ticker1RecentMarketData['bidPrice1'] + ticker1RecentMarketData['askPrice1'])/2)
@@ -109,7 +112,7 @@ class SampleDummyStrategy(QuantStrategy):
                 netWrorth += self.positions[ticker1][-1] * self.midPrices[ticker1][-1]
             if len(self.positions[ticker2]) > 0:
                 netWrorth += self.positions[ticker2][-1] * self.midPrices[ticker2][-1]
-            
+
             #print(self.timestamp[-1],self.cash[-1],netWrorth)
             '''记录到共享队列analysis_q中'''
             # update analysis: timestamp, networth, cash
@@ -122,8 +125,10 @@ class SampleDummyStrategy(QuantStrategy):
                 'midPrice_'+ticker1: self.midPrices[ticker1][-1],
                 'midPrice_'+ticker2: self.midPrices[ticker2][-1]
             })
-            
 
+
+            if len(ticker2MarketData_trades) > 0:
+                ticker2RecentMarketData_trades = ticker2MarketData_trades[-1]
 
             if ticker1RecentMarketData is not None and ticker2RecentMarketData is not None:
                 #########do some calculation with the recent market data
@@ -135,7 +140,7 @@ class SampleDummyStrategy(QuantStrategy):
                     date=now.date(),
                     submissionTime=now.time()
                 )
-                sampleOrder1.orderID = f"{self.getStratID()}-2610-{str(uuid1())}"
+                sampleOrder1.orderID = f"{self.getStratID()}-{ticker1}-{str(uuid1())}"
                 sampleOrder1.type = "MO"
                 sampleOrder1.currStatus = "New"
                 sampleOrder1.currStatusTime = now.time()
@@ -148,7 +153,7 @@ class SampleDummyStrategy(QuantStrategy):
                     date=now.date(),
                     submissionTime=now.time()
                 )
-                sampleOrder2.orderID = f"{self.getStratID()}-3374-{str(uuid1())}"
+                sampleOrder2.orderID = f"{self.getStratID()}-{ticker2}-{str(uuid1())}"
                 sampleOrder2.type = "LO"
                 sampleOrder2.currStatus = "New"
                 sampleOrder2.currStatusTime = now.time()
@@ -157,15 +162,14 @@ class SampleDummyStrategy(QuantStrategy):
                 sampleOrder2.price = ticker2RecentMarketData['bidPrice5'].item()
                 sampleOrder2.stratID = self.getStratID()
 
-                
-                
+
                 ######return a list
                 return [sampleOrder1,sampleOrder2]
         else:
             #######on receive execution
             order = self.orderManager.lookupOrderID(execution.orderID)
 
-            
+
             '''记录持仓'''
             ticker, tradesize, direction, tradeprice = execution.ticker, execution.size, execution.direction,execution.price
             self.execution_record.append({
@@ -181,16 +185,19 @@ class SampleDummyStrategy(QuantStrategy):
 
 
             ######do something
+            if order.currStatus == "PartiallyFilled":
+                from datetime import datetime
+                now = datetime.now()
+                sampleOrder3 = order.copyOrder()
+                sampleOrder3.type = "CANCEL"
+                return [sampleOrder3]
 
-            ####e.g. issue cancel order
-            # if order.type == "LO":
-            #     order.type = "CANCEL"
             return []
+
+
 
         return []
 
-
-                
 
 class InDevelopingStrategy(QuantStrategy):
     def __init__(self, stratID, stratName, stratAuthor, ticker, day,
@@ -383,36 +390,78 @@ class InDevelopingStrategy(QuantStrategy):
 
         signal_df = pd.DataFrame(signal)
         return signal_df
-    def run(self,execution:SingleStockExecution)->list[SingleStockOrder]:
-        if execution is None:#######on receive market data
+
+    def run(self, execution: SingleStockExecution) -> list[SingleStockOrder]:
+        ticker1 = self.ticker[0]
+        ticker2 = self.ticker[1]
+        flag = 0
+        if execution is None:  #######on receive market data
             ####get most recent market data for ticker
-            '''we assume ticker1 is stock, ticker2 is future 
-            the data we acquire is a list of dataframe containg all data frmo the beginning to the lastest one'''
-            ticker1 = "2610"
-            ticker2 = "3374"
-            ticker1MarketData:list[pd.DataFrame] = self.tickers2Snapshots[ticker1]
-            ticker2MarketDataQ:list[pd.DataFrame] = self.tickers2Snapshots[ticker2]['Quote']
-            ticker2MarketDataT: list[pd.DataFrame] = self.tickers2Snapshots[ticker2]['Trade']
-            ticker1RecentMarketData = None
-            ticker2RecentMarketData = None
+            ticker1MarketData: list[pd.DataFrame] = self.tickers2Snapshots[ticker1]
+            ticker2MarketDataQ: list[pd.DataFrame] = self.tickers2Snapshots[ticker2]['futures_quotes']
+            ticker2MarketDataT: list[pd.DataFrame] = self.tickers2Snapshots[ticker2]['futures_trades']
 
             if len(ticker1MarketData) > 0:
-                # ticker1RecentMarketData = ticker1MarketData[-1]
+                flag += 1
                 ticker1RecentMarketData = ticker1MarketData[-1]
+                '''更新价格1'''
+                self.midPrices[ticker1].append(
+                    (ticker1RecentMarketData['bidPrice1'] + ticker1RecentMarketData['askPrice1']) / 2)
+                # print('更新价格1',ticker1RecentMarketData['time'])
+                # df['date'] + pd.to_timedelta(df['time'].astype(str))
+                self.timestamp.append(pd.to_datetime(ticker1RecentMarketData['date']) + pd.to_timedelta(
+                    ticker1RecentMarketData['time'].astype(str)))
+                # self.timestamp.append(pd.to_datetime(ticker1RecentMarketData['date']  + ticker1RecentMarketData['time']))
+                # 将新信息存储到历史表列表中
+                self.stockdf.append(ticker1RecentMarketData)
 
             if len(ticker2MarketDataQ) > 0:
-                ticker2RecentMarketDataQ = ticker2MarketDataQ[-1]
+                flag += 1
+                ticker2RecentMarketData = ticker2MarketDataQ[-1]
+                '''更新价格2'''
+                self.midPrices[ticker2].append(
+                    (ticker2RecentMarketData['bidPrice1'] + ticker2RecentMarketData['askPrice1']) / 2)
+                # print('更新价格2',ticker2RecentMarketData['time'])
+                # self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'].to_string + ' ' + ticker2RecentMarketData['time']))
+                # unsupported operand type(s) for +: 'DatetimeArray' and 'str'
+                self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date']) + pd.to_timedelta(
+                    ticker2RecentMarketData['time'].astype(str)))
+                # self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'] + ticker2RecentMarketData['time']))
+                self.futuredfQ.append(ticker2RecentMarketData)
 
-            if len(ticker2MarketDataQ) > 0:
-                ticker2RecentMarketDataT = ticker2MarketDataT[-1]
+            if len(ticker2MarketDataT) > 0:
+                flag += 1
+                ticker2RecentMarketData = ticker2MarketDataT[-1]
+                # 更新trade表
+                self.futuredfT.append(ticker2RecentMarketData)
+            '''使用更新后的价格计算净值'''
+            netWrorth = self.cash[-1]
+            if len(self.positions[ticker1]) > 0:
+                netWrorth += self.positions[ticker1][-1] * self.midPrices[ticker1][-1]
+            if len(self.positions[ticker2]) > 0:
+                netWrorth += self.positions[ticker2][-1] * self.midPrices[ticker2][-1]
 
+            # print(self.timestamp[-1],self.cash[-1],netWrorth)
+            '''记录到共享队列analysis_q中'''
+            # update analysis: timestamp, networth, cash
+            self.analysis_q.put({
+                'timestamp': self.timestamp[-1],
+                'cash': self.cash[-1],
+                'networth': netWrorth,
+                'positions_' + ticker1: self.positions[ticker1][-1],
+                'positions_' + ticker2: self.positions[ticker2][-1],
+                'midPrice_' + ticker1: self.midPrices[ticker1][-1],
+                'midPrice_' + ticker2: self.midPrices[ticker2][-1]
+            })
 
-            if ticker1RecentMarketData is not None and ticker2RecentMarketDataQ is not None and ticker2RecentMarketDataT is not None:
-                #########do some calculation with the recent market data that means we get new data?
-                #.....
-                stock_df = pd.concat()
-                df1, df2 = self.get_data(self.tickers2Snapshots[ticker1], self.tickers2Snapshots[ticker2]['Quote'],
-                                         self.tickers2Snapshots[ticker2]['Trade'])
+            if flag >= 1:
+                #########do some calculation with the recent market data
+                # .....
+                stock_df = pd.cancat(self.stockdf)
+                future_dfQ = pd.cancat(self.futuredfQ)
+                future_dfT = pd.cancat(self.futuredfT)
+                df1, df2 = self.get_data(stock_df, future_dfQ,
+                                         future_dfT)
 
                 orders = self.generate_signal(df1, df2, 10)
                 direction_stock = 1 if orders.iloc[:, 1].item() == 1 else -1 if orders.iloc[:, 2].item() == 1 else 0
@@ -423,32 +472,32 @@ class InDevelopingStrategy(QuantStrategy):
                     cash_future = 0
                 else:
                     cash_stock = self.cash[-1] * self.cashCostRatio // 2
-                    cash_future = self.cash[- 1] * self.cashCostRatio // 2
+                    cash_future = self.cash[-1] * self.cashCostRatio // 2
                 if direction_stock > 0:
-                    ordersizeStock = cash_stock / ticker1RecentMarketData['AskPrice1']
+                    ordersizeStock = cash_stock // ticker1RecentMarketData['AskPrice1']
                     odprice = ticker1RecentMarketData['AskPrice1']
                 elif direction_stock < 0:
-                    ordersizeStock = cash_stock / ticker1RecentMarketData['BidPrice1']
+                    ordersizeStock = cash_stock // ticker1RecentMarketData['BidPrice1']
                     odprice = ticker1RecentMarketData['BidPrice1']
                 else:
                     ordersizeStock = 0
                     odprice = 0
 
                 if direction_futures > 0:
-                    ordersizeFutures = cash_stock / ticker2MarketDataQ['AskPrice1']
+                    ordersizeFutures = cash_stock // ticker2MarketDataQ['AskPrice1']
                     odpriceF = ticker2MarketDataQ['AskPrice1']
                 elif direction_futures < 0:
-                    ordersizeFutures = cash_stock / ticker2MarketDataQ
+                    ordersizeFutures = cash_stock // ticker2MarketDataQ
                     odpriceF = ticker2MarketDataQ
                 else:
                     ordersizeFutures = 0
                     odpriceF = 0
                 if ordersizeFutures == 0 and ordersizeStock == 0:
-                    return
+                    return []
                 from datetime import datetime
                 now = datetime.now()
                 sampleOrder1 = SingleStockOrder(
-                    ticker="2610",
+                    ticker=ticker1,
                     date=now.date(),
                     submissionTime=now.time()
                 )
@@ -461,15 +510,15 @@ class InDevelopingStrategy(QuantStrategy):
                 sampleOrder1.stratID = self.getStratID()
 
                 sampleOrder2 = SingleStockOrder(
-                    ticker="3374",
+                    ticker=ticker2,
                     date=now.date(),
                     submissionTime=now.time()
                 )
                 sampleOrder2.orderID = f"{self.getStratID()}-3374-{str(uuid1())}"
-                sampleOrder2.type = "LO"
+                sampleOrder2.type = "MO"
                 sampleOrder2.currStatus = "New"
                 sampleOrder2.currStatusTime = now.time()
-                sampleOrder2.direction = direction_futures###1 = buy; -1 = sell
+                sampleOrder2.direction = direction_futures  ###1 = buy; -1 = sell
                 sampleOrder2.size = ordersizeFutures
                 sampleOrder2.price = ticker2RecentMarketData['bidPrice5'].item()
                 sampleOrder2.stratID = self.getStratID()
@@ -478,25 +527,28 @@ class InDevelopingStrategy(QuantStrategy):
                 self.submitted_order.append(sampleOrder2.orderID)
                 self.untreated_order.append(sampleOrder1.orderID)
                 self.untreated_order.append(sampleOrder2.orderID)
+
                 ######return a list
-                return [sampleOrder1,sampleOrder2]
+                return [sampleOrder1, sampleOrder2]
         else:
             #######on receive execution
             order = self.orderManager.lookupOrderID(execution.orderID)
-
-            ######do something
-            if order.currStatus == 'executed':
+            if order.currStatus == 'Filled':
                 self.untreated_order.remove(order.orderID)
-                ticker, tradesize, direction, tradeprice = order.ticker, order.size, order.direction,order.price
+                ticker, tradesize, direction, tradeprice = execution.ticker, execution.size, execution.direction, execution.price
                 self.position[ticker].append(self.position[ticker][-1] + tradesize * direction)
                 self.pnl.append(self.pnl[-1] - tradesize * direction * tradeprice)
                 self.cash.append(self.cash[-1] - tradesize * direction * tradeprice)
-                '''price1 和 price2 应该取最新的成交价，具体那个字段我目前不太清楚'''
-
-                self.networth.append(self.position[self.tickers[0]][-1] * price1 + self.position[self.tickers[1]][
-                    -1] * price2 + self.cash[-1])
+                self.execution_record.append({
+                    'timestamp': execution.timeStamp,
+                    'ticker': ticker,
+                    'size': tradesize,
+                    'direction': direction,
+                    'price': tradeprice
+                })
 
             ####e.g. issue cancel order
+            cancelOrders = []
             for id in self.untreated_order:
                 order = self.orderManager.lookupOrderID(id)
                 if order.type == 'LO':
@@ -504,21 +556,35 @@ class InDevelopingStrategy(QuantStrategy):
                     currentTime = now.time()
                     if order.submissionTime < currentTime - timedelta(seconds=10):
                         self.untreated_order.remove(id)
-                        order.type = 'CANCEL'
+                        order.currStatus = 'Cancelled'
+                        sampleOrder3 = order.copyOrder()
+                        sampleOrder3.type = "CANCEL"
+                        cancelOrders.append(sampleOrder3)
                     elif order.ticker == self.tickers[0]:
                         if self.lastdirection1 != order.direction:
-                            order.type = 'CANCEL'
+                            order.currStatus = 'Cancelled'
                             self.untreated_order.remove(id)
+                            sampleOrder3 = order.copyOrder()
+                            sampleOrder3.type = "CANCEL"
+                            cancelOrders.append(sampleOrder3)
                     elif order.ticker == self.tickers[1]:
                         if self.lastdirection2 != order.direction:
-                            order.type = 'CANCEL'
+                            order.currStatus = 'Cancelled'
                             self.untreated_order.remove(id)
-                    else:
-                        continue
+                            sampleOrder3 = order.copyOrder()
+                            sampleOrder3.type = "CANCEL"
+                            cancelOrders.append(sampleOrder3)
+                elif order.currStatus == "PartiallyFilled":
+                    from datetime import datetime
+                    now = datetime.now()
+                    sampleOrder3 = order.copyOrder()
+                    sampleOrder3.type = "CANCEL"
+                    return cancelOrders.append(sampleOrder3)
+                else:
+                    continue
+
             # if order.type == "LO":
             #     order.type = "CANCEL"
-            return []
-
-
+            return cancelOrders
 
         return []
