@@ -180,7 +180,8 @@ def back_test_analysis():
             dcc.Input(id='end_date', value='20240628', type='text', style={'margin-bottom': '10px'}),
             html.Label('Start Time', style={'font-weight': 'bold'}),
             # should be int
-            dcc.Input(id='start_time', value=123015869, type='number', style={'margin-bottom': '10px'}),
+            # dcc.Input(id='start_time', value=123015869, type='number', style={'margin-bottom': '10px'}),
+            dcc.Input(id='start_time', value=90000000, type='number', style={'margin-bottom': '10px'}),
             html.Label('Initial Cash', style={'font-weight': 'bold'}),
             dcc.Input(id='initial_cash', value=1000000, type='number', style={'margin-bottom': '10px'}),
             html.Label('Play Speed', style={'font-weight': 'bold'}),

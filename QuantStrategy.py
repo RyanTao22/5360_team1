@@ -448,9 +448,9 @@ class InDevelopingStrategy(QuantStrategy):
             return sign
         print('set op')
         if base == 'future':
-            op = 1 if gain_sign(base) < 1-trust_prob else -1 if gain_sign(base) > trust_prob else 0
+            op = 1 if gain_sign(base) < 1-trust_prob else -1 if gain_sign(base) > trust_prob else 2
         elif base == 'stock':
-            op = -1 if gain_sign(base) < 1-trust_prob else 1 if gain_sign(base) > trust_prob else 0
+            op = -1 if gain_sign(base) < 1-trust_prob else 1 if gain_sign(base) > trust_prob else 2
         
         op_lis.append({"time":time,"op":op})
         
@@ -649,35 +649,40 @@ class InDevelopingStrategy(QuantStrategy):
                 else:
                     cash_stock = self.cash[-1] * self.cashCostRatio // 2
                     cash_future = self.cash[-1] * self.cashCostRatio // 2
-                # if direction_stock > 0:
-                #     if ordersizeStock == 0:
-                #         ordersizeStock = cash_stock // stock_df.iloc[-1,]['askPrice1']
-                #     odprice = stock_df.iloc[-1,]['askPrice1']
-                # elif direction_stock < 0:
-                #     if ordersizeStock == 0:
-                #         ordersizeStock = cash_stock // stock_df.iloc[-1,]['bidPrice1']
-                #         # print(stock_df.iloc[-1,]['bidPrice1'], ordersizeStock)
-                #     odprice = stock_df.iloc[-1,]['bidPrice1']
-                # else:
-                #     ordersizeStock = 0
-                #     odprice = 0
+                
+                #######
+                if direction_stock > 0:
+                    if ordersizeStock == 0:
+                        ordersizeStock = cash_stock // stock_df.iloc[-1,]['askPrice1']
+                    odprice = stock_df.iloc[-1,]['askPrice1']
+                elif direction_stock < 0:
+                    if ordersizeStock == 0:
+                        ordersizeStock = cash_stock // stock_df.iloc[-1,]['bidPrice1']
+                        # print(stock_df.iloc[-1,]['bidPrice1'], ordersizeStock)
+                    odprice = stock_df.iloc[-1,]['bidPrice1']
+                else:
+                    ordersizeStock = 0
+                    odprice = 0
 
-                # if direction_futures > 0:
-                #     if ordersizeFutures == 0:
-                #         ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['askPrice1']
-                #         # print(future_dfQ.iloc[-1,]['askPrice1'],ordersizeFutures)
-                #     odpriceF = future_dfQ.iloc[-1,]['askPrice1']
-                # elif direction_futures < 0:
-                #     if ordersizeFutures == 0:
-                #         ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['bidPrice1']
-                #     odpriceF = future_dfQ.iloc[-1,]['bidPrice1']
-                # else:
-                #     ordersizeFutures = 0
-                #     odpriceF = 0
-                if direction_stock != 0:
-                    ordersizeStock = 1
-                if direction_futures != 0:
-                    ordersizeFutures = 1
+                if direction_futures > 0:
+                    if ordersizeFutures == 0:
+                        ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['askPrice1']
+                        # print(future_dfQ.iloc[-1,]['askPrice1'],ordersizeFutures)
+                    odpriceF = future_dfQ.iloc[-1,]['askPrice1']
+                elif direction_futures < 0:
+                    if ordersizeFutures == 0:
+                        ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['bidPrice1']
+                    odpriceF = future_dfQ.iloc[-1,]['bidPrice1']
+                else:
+                    ordersizeFutures = 0
+                    odpriceF = 0
+                #######
+                # if direction_stock != 0:
+                #     ordersizeStock = 1
+                # if direction_futures != 0:
+                #     ordersizeFutures = 1
+                print('ordersizeStock',ordersizeStock)
+                print('ordersizeFutures',ordersizeFutures)
                 if ordersizeFutures == 0 and ordersizeStock == 0:
                     print(2)
                     return []

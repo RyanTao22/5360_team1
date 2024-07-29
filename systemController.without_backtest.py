@@ -73,7 +73,8 @@ if __name__ == '__main__':
     #########v3
     startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest,resampleFreq = ('2024-06-28',
                                                                                                              '2024-06-28',
-                                                                                                             122015869,
+                                                                                                             90000000,
+                                                                                                            #  122015869,
                                                                                                             # 132315869,
                                                                                                              ['2618'],
                                                                                                              ['HSF1'],
