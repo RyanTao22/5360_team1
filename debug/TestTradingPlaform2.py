@@ -7,13 +7,13 @@ Created on Thu Jun 20 10:26:05 2020
 from copy import deepcopy
 from multiprocessing import Process, Queue
 
-from common.Exchange.Command import OverwriteOrderBookCommand, MarketOrderCommand, LimitOrderCommand, CancelOrderCommand
+from common.Exchange.Command import MarketDataCommand, MarketOrderCommand, LimitOrderCommand, CancelOrderCommand
 from common.Exchange.OrderBookManager import OrderBookManager
 from common.SingleStockExecution import SingleStockExecution
 from common.SingleStockOrder import SingleStockOrder
 from marketDataService import MarketDataService
 from exchangeSimulator import ExchangeSimulator
-from quantTradingPlatform import TradingPlatform
+from quantTradingPlatform import TradingPlatform, DummyTradingPlatform
 import pandas as pd
 from os.path import join
 from pathlib import Path
@@ -25,38 +25,62 @@ from uuid import uuid1
 marketData_2_exchSim_q = Queue()
 marketData_2_platform_q = Queue()
 
+futureData_2_exchSim_q = Queue()
+futureData_2_platform_q = Queue()
+
 platform_2_exchSim_order_q = Queue()
 exchSim_2_platform_execution_q = Queue()
+
+platform_2_futuresExchSim_order_q = Queue()
 
 platform_2_strategy_md_q = Queue()
 strategy_2_platform_order_q = Queue()
 platform_2_strategy_execution_q = Queue()
-exchSim_2_platform_orderID_q = Queue()
+analysis_q = Queue()
 
 
-def dfToSnapshot(df:pd.DataFrame,ticker):
-    df = df.sort_index(axis=1)
-    return [
-        OrderBookSnapshot_FiveLevels(ticker, r1["date"], r1["time"],
-                                             bidPrice=r1["BP1":"BP5"], askPrice=r1["SP1":"SP5"],
-                                             bidSize=r1["BV1":"BV5"], askSize=r1["SV1":"SV5"])
-        for _,r1 in df.iterrows()
-    ]
+def dfToSnapshotStocks(cData:pd.DataFrame):
+    snapshots =[]
+    for index, row in cData.iterrows():
+        now = datetime.now()
+        quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, now.date(), now.time(),
+                                                     bidPrice=row["BP1":"BP5"].tolist(),
+                                                     askPrice=row["SP1":"SP5"].tolist(),
+                                                     bidSize=row["BV1":"BV5"].tolist(),
+                                                     askSize=row["SV1":"SV5"].tolist())
+        quoteSnapshot.type = "both"
+        quoteSnapshot.midQ = row.get("midQ")
+        quoteSnapshot.symbol = row.get("symbol")
+        quoteSnapshot.totalMatchSize = row.get("totalMatchSize")
+        quoteSnapshot.totalMatchValue = row.get("totalMatchValue")
+        quoteSnapshot.avgMatchPx = row.get("avgMatchPx")
+        quoteSnapshot.size = row.get("size")
+        quoteSnapshot.volume = row.get("volume")
+        quoteSnapshot.lastPx = row.get("lastPx")
+        snapshots.append(quoteSnapshot)
+    return snapshots
 
-def setupExchSim():
+def dfToSnapshotFutures(tqcData:pd.DataFrame):
+    snapshots =[]
+    for index, row in tqcData.iterrows():
+        now = datetime.now()
+        quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, now.date(), now.time(),
+                                                     bidPrice=row["bidPrice1":"bidPrice5"].tolist(),
+                                                     askPrice=row["askPrice1":"askPrice5"].tolist(),
+                                                     bidSize=row["bidSize1":"bidSize5"].tolist(),
+                                                     askSize=row["askSize1":"askSize5"].tolist())
+        quoteSnapshot.type = row.get("type")
+        quoteSnapshot.midQ = row.get("midQ")
+        quoteSnapshot.symbol = row.get("symbol")
+        quoteSnapshot.totalMatchSize = row.get("totalMatchSize")
+        quoteSnapshot.totalMatchValue = row.get("totalMatchValue")
+        quoteSnapshot.avgMatchPx = row.get("avgMatchPx")
+        quoteSnapshot.size = row.get("size")
+        quoteSnapshot.volume = row.get("volume")
+        quoteSnapshot.lastPx = row.get("lastPx")
+        snapshots.append(quoteSnapshot)
+    return snapshots
 
-    #######create mgr for 2610
-    # tickers = ["2610"]
-    # mgrs = [OrderBookManager(ticker=ticker) for ticker in tickers]
-
-    p = Process(name='sim', target=ExchangeSimulator,
-                args=(marketData_2_exchSim_q,
-                      platform_2_exchSim_order_q,
-                      exchSim_2_platform_execution_q,
-                      ))
-    p.start()
-
-    return p
 
 def setupTradingPlatform():
 
@@ -66,8 +90,10 @@ def setupTradingPlatform():
     p = Process(name='sim', target=TradingPlatform,
                 args=(marketData_2_platform_q,
                       platform_2_exchSim_order_q,
+                      platform_2_futuresExchSim_order_q,
                       exchSim_2_platform_execution_q,
-                      ))
+                      None,
+                      True,))
     p.start()
 
     return p
@@ -83,21 +109,36 @@ if __name__ == '__main__':
 
     ###########read some snapshot data
     parent_dir = Path(__file__).parent
-    df1 = pd.read_csv(join(parent_dir,'processedData_2024','stocks','2610_md_202404_202404.csv.gz'),nrows=20)
-    snapshots1 = dfToSnapshot(df1,"2610")
-    df2 = pd.read_csv(join(parent_dir,'processedData_2024','stocks','3374_md_202404_202404.csv.gz'),nrows=20)
-    snapshots2 = dfToSnapshot(df2,"3374")
+    dfStocks = pd.read_pickle('./stocksData.1000.pkl').reset_index(drop=True)
+    dfFutures = pd.read_pickle('./futuresData.1000.pkl').reset_index(drop=True)
+    snapshots1 = dfToSnapshotStocks(dfStocks)
+    snapshots2 = dfToSnapshotFutures(dfFutures)
 
+    startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest,resampleFreq = ('2024-06-28',
+                                                                                                             '2024-06-28',
+                                                                                                             90000000,
+                                                                                                            #  122015869,
+                                                                                                            # 132315869,
+                                                                                                             ['2610'],
+                                                                                                             ['NEF1'],
+                                                                                                             10000000,
+                                                                                                             1000000,
+                                                                                                             False,
+                                                                                                             True,
+                                                                                                             '1s')
+    # exchSimProcess = setupTradingPlatform()
+    platform = DummyTradingPlatform(marketData_2_platform_q, platform_2_exchSim_order_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, stockCodes, futuresCodes, initial_cash, analysis_q, None, debug)
 
-    exchSimProcess = setupTradingPlatform()
-    time.sleep(10)
 
     ###########
-    marketData_2_platform_q.put(snapshots1[0])
-    # time.sleep(1)
+    marketData_2_platform_q.put(snapshots1[103])
+    time.sleep(1)
 
-    marketData_2_platform_q.put(snapshots2[0])
-    # time.sleep(1)
+
+    futures_quotes1 = snapshots2[0]
+    futures_trades1 = snapshots2[11]
+    marketData_2_platform_q.put(futures_quotes1)
+    time.sleep(1)
 
     ##################MO Flow
     #########send back order with exOrderID
@@ -123,7 +164,7 @@ if __name__ == '__main__':
 
     #################LO Flow
     #########send back order with exOrderID
-    order:SingleStockOrder = platform_2_exchSim_order_q.get()
+    order:SingleStockOrder = platform_2_futuresExchSim_order_q.get()
     order.exOrderID = str(uuid1())
     exchSim_2_platform_execution_q.put(order)
 
@@ -144,5 +185,20 @@ if __name__ == '__main__':
     exchSim_2_platform_execution_q.put(ex)
 
 
-
+    ########Cancel Order Flow
+    order:SingleStockOrder = platform_2_futuresExchSim_order_q.get()
+    exchSim_2_platform_execution_q.put(order)
+    now = datetime.now()
+    ex = SingleStockExecution(
+        ticker=order.ticker,
+        date=now.date(),
+        timeStamp=now.timestamp()
+    )
+    ex.execID = str(uuid1())
+    ex.orderID = order.orderID
+    ex.exOrderID = order.exOrderID
+    ex.direction = order.direction
+    ex.price = None
+    ex.size = None
+    exchSim_2_platform_execution_q.put(ex)
     print()

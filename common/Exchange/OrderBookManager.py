@@ -103,8 +103,8 @@ class OrderBookManager:
     def cancelOrder(self, exOrderID):
         order = self.__orders.get(exOrderID)
         if order is not None: order.size = 0
-        order = self.__stopOrders.get(exOrderID)
-        if order is not None: order.size = 0
+        # order = self.__stopOrders.get(exOrderID)
+        # if order is not None: order.size = 0
         self.__orders.pop(exOrderID,None)
         self.__stopOrders.pop(exOrderID,None)
         self.__produceExecution(order,None,None)
