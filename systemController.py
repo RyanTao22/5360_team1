@@ -79,8 +79,8 @@ def calculate_indicators(net_worth_list, baseline_networth, initial_cash, timest
 
 def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest):
     
-    stockCodes = MarketDataServiceConfig.stockCodes
-    futuresCodes = MarketDataServiceConfig.futuresCodes
+    # stockCodes = MarketDataServiceConfig.stockCodes
+    # futuresCodes = MarketDataServiceConfig.futuresCodes
 
     marketData_2_exchSim_q = Queue()
     marketData_2_platform_q = Queue()
