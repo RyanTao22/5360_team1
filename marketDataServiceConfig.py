@@ -14,6 +14,6 @@ class MarketDataServiceConfig:
 
     #config added for v2
     startTime = 90515869  # hhmmss.sss
-    futureCodes = ['DBF1', 'GLF1', 'HCF1', 'HSF1', 'IPF1', 'NEF1', 'NLF1', 'NYF1', 'QLF1', 'RLF1']
+    futuresCodes = ['DBF1', 'GLF1', 'HCF1', 'HSF1', 'IPF1', 'NEF1', 'NLF1', 'NYF1', 'QLF1', 'RLF1']
     futuresQuotesPath = '\\futuresQuotes\\'
     futuresTradesPath = '\\futuresTrades\\'

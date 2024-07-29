@@ -33,7 +33,7 @@ class FutureDataService:
     tqcData = {}
 
 
-    def __init__(self, futureData_2_exchSim_q, futureData_2_platform_q, startDate, endDate, startTime,futuresCodes,playSpeed, backTest,isReady=None):
+    def __init__(self, futureData_2_exchSim_q, futureData_2_platform_q, startDate, endDate, startTime,futuresCodes,playSpeed, backTest,resampleFreq,isReady=None):
         self.startDate = startDate
         self.endDate = endDate
         self.startTime = startTime
@@ -70,6 +70,9 @@ class FutureDataService:
         print("[%d]<<<<< call FutureDataService.calculateTimestampDiff" % (os.getpid(),))
         self.calculateTimestampDiff()
 
+        print("[%d]<<<<< call FutureDataService.resampleData" % (os.getpid(),))
+        self.resampleData(resampleFreq)
+
 
         # if isReady is not None:
         #     while isReady.value==0:
@@ -92,7 +95,13 @@ class FutureDataService:
         #
         # self.produce_quote(marketData_2_exchSim_q, marketData_2_platform_q)
 
-
+    def resampleData(self,resampleFreq):
+        if resampleFreq != None:
+            self.tqcData.index = self.tqcData.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
+            self.tqcData = self.tqcData.resample(resampleFreq).last()
+            self.tqcData.dropna(inplace=True)
+            self.tqcData.reset_index(drop = True,inplace=True)
+    
     def unzipFile(self):
         print("start to check and unzip")
         #print(MarketDataServiceConfig.mainDir)
@@ -291,10 +300,16 @@ class FutureDataService:
     #     self.produce_quote(marketData_2_exchSim_q, marketData_2_platform_q)
     #     time.sleep(5)
 
-    def produce_future(self, futureData_2_exchSim_q, futureData_2_platform_q):
+    def produce_future(self, futureData_2_exchSim_q, futureData_2_platform_q,resampleFreq):
         print("[%d]<<<<< call FutureDataService.init" % (os.getpid(),))
         print("[%d]<<<<< call start to feed future quotes and trades" % (os.getpid(),))
         self.tqcData.sort_values(by=['date', 'time'], ascending=True, inplace=True)
+
+        if resampleFreq != None:
+            self.tqcData.index = a.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
+            self.tqcData = self.tqcData.resample(resampleFreq).last()
+            self.tqcData.dropna(inplace=True)
+            self.tqcData.reset_index(drop = True,inplace=True)
         
         '''获取列名,避免受顺序影响'''
         askPrice_cols_list = ['askPrice'+str(i) for i in range(1,6)]

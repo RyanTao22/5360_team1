@@ -11,7 +11,7 @@ from UnifiedDataService import UnifiedDataService
 from marketDataService import MarketDataService
 from futureDataService import FutureDataService
 from exchangeSimulator import ExchangeSimulator
-from quantTradingPlatform import TradingPlatform
+from quantTradingPlatform import TradingPlatform 
 import time
 from marketDataServiceConfig import MarketDataServiceConfig
 
@@ -20,7 +20,7 @@ if __name__ == '__main__':
     # Define all components
     ###########################################################################
     stockCodes = MarketDataServiceConfig.stockCodes
-    futuresCodes = MarketDataServiceConfig.futureCodes
+    futuresCodes = MarketDataServiceConfig.futuresCodes
 
     marketData_2_exchSim_q = Queue()
     marketData_2_platform_q = Queue()
@@ -71,18 +71,19 @@ if __name__ == '__main__':
     # Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, stockCodes, futuresCodes, initial_cash, analysis_q, isReady, debug)).start()
 
     #########v3
-    startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest = ('2024-06-28',
+    startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest,resampleFreq = ('2024-06-28',
                                                                                                              '2024-06-28',
                                                                                                              122015869,
                                                                                                             # 132315869,
-                                                                                                             ['2610'],
-                                                                                                             ['NEF1'],
+                                                                                                             ['2618'],
+                                                                                                             ['HSF1'],
                                                                                                              10000000,
                                                                                                              1000000,
                                                                                                              False,
-                                                                                                             True)
-    fds = FutureDataService(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)
-    mds = MarketDataService(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, isReady)
+                                                                                                             True,
+                                                                                                             '1s')
+    fds = FutureDataService(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest,resampleFreq, isReady)
+    mds = MarketDataService(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest,resampleFreq, isReady)
     Process(name='uds', target=UnifiedDataService, args=(mds,fds)).start()
     # Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)).start()
     Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)).start()

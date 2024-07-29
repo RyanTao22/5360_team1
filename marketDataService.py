@@ -24,7 +24,7 @@ class MarketDataService:
     cData = {}
 
 
-    def __init__(self, marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime,stockCodes,playSpeed,backTest, isReady=None):
+    def __init__(self, marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime,stockCodes,playSpeed,backTest, resampleFreq, isReady=None):
         self.startDate = startDate
         self.endDate = endDate
         self.startTime = startTime
@@ -48,12 +48,22 @@ class MarketDataService:
         print("[%d]<<<<< call MarketDataService.calculateTimestampDiff" % (os.getpid(),))
         self.calculateTimestampDiff()
 
+        print("[%d]<<<<< call MarketDataService.resampleData" % (os.getpid(),))
+        self.resampleData(resampleFreq)
+
         # if isReady is not None:
         #     while isReady.value==0:
         #         print("sleep for 3 secs")
         #         time.sleep(3)
 
         # self.produce_quote(marketData_2_exchSim_q, marketData_2_platform_q)
+
+    def resampleData(self,resampleFreq):
+        if resampleFreq != None:
+            self.cData.index = self.cData.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
+            self.cData = self.cData.resample(resampleFreq).last()
+            self.cData.dropna(inplace=True)
+            self.cData.reset_index(drop = True,inplace=True)
 
 
     def unzipFile(self):
@@ -145,10 +155,15 @@ class MarketDataService:
     #     self.produce_quote(marketData_2_exchSim_q, marketData_2_platform_q)
     #     time.sleep(5)
 
-    def produce_quote(self, marketData_2_exchSim_q, marketData_2_platform_q):
+    def produce_quote(self, marketData_2_exchSim_q, marketData_2_platform_q,resampleFreq):
         print("[%d]<<<<< call MarketDataService.init" % (os.getpid(),))
         self.cData.sort_index(axis=1,inplace=True)
 
+        if resampleFreq != None:
+            self.cData.index = a.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
+            self.cData = self.cData.resample(resampleFreq).last()
+            self.cData.dropna(inplace=True)
+            self.cData.reset_index(drop = True,inplace=True)
 
         '''获取列名,避免受顺序影响'''
         BP_cols_list = ['BP'+str(i) for i in range(1,6)]

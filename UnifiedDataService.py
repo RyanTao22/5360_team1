@@ -42,7 +42,7 @@ class UnifiedDataService:
                     # time should be row['time'] in a proper format as now.time() (from 90515951: 09:05:15.951000)
 
                     quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, datetime.datetime.strptime(row['date'], '%Y-%m-%d'),
-                                                                 datetime.datetime.strptime(str(row['time']), '%H%M%S%f').time(),
+                                                                 datetime.datetime.strptime(str(int(row['time'])).zfill(8), '%H%M%S%f').time(),
                                                                  bidPrice=[row[BP_cols_list[i]] for i in range(5)],
                                                                  askPrice=[row[SP_cols_list[i]] for i in range(5)],
                                                                  bidSize=[row[BV_cols_list[i]] for i in range(5)],
@@ -70,7 +70,7 @@ class UnifiedDataService:
                     diff = float(row['ts_diff'])/1000/self.fds.playSpeed
 
                     quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, datetime.datetime.strptime(row['date'], '%Y-%m-%d'),
-                                                                    datetime.datetime.strptime(str(row['time']), '%H%M%S%f').time(),
+                                                                    datetime.datetime.strptime(str(int(row['time'])).zfill(8), '%H%M%S%f').time(),
                                                                     askPrice=[row[askPrice_cols_list[i]] for i in range(5)],
                                                                     bidPrice=[row[bidPrice_cols_list[i]] for i in range(5)],
                                                                     askSize=[row[askSize_cols_list[i]] for i in range(5)],

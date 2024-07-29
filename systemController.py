@@ -9,8 +9,17 @@ import plotly.graph_objs as go
 from multiprocessing import Process, Queue, set_start_method
 from marketDataService import MarketDataService
 from futureDataService import FutureDataService
+from UnifiedDataService import UnifiedDataService
 from exchangeSimulator import ExchangeSimulator
 from quantTradingPlatform import TradingPlatform
+
+from multiprocessing import Process, Queue,Value
+
+
+ 
+import time
+from marketDataServiceConfig import MarketDataServiceConfig
+
 import os
 import pandas as pd
 import time
@@ -69,6 +78,10 @@ def calculate_indicators(net_worth_list, baseline_networth, initial_cash, timest
 
 
 def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest):
+    
+    stockCodes = MarketDataServiceConfig.stockCodes
+    futuresCodes = MarketDataServiceConfig.futuresCodes
+
     marketData_2_exchSim_q = Queue()
     marketData_2_platform_q = Queue()
 
@@ -85,28 +98,56 @@ def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSp
     platform_2_strategy_execution_q = Queue()
 
     analysis_q = Queue()
+
+
     isReady = None
 
     processes = []
 
-    # try:
-    if futuresCodes == []:
-        processes.append(Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, isReady)))
-        processes.append(Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)))
-    elif stockCodes == []:
-        processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
-        processes.append(Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)))
-    else:
-        processes.append(Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, isReady)))
-        processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
-        processes.append(Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)))
-        processes.append(Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)))
+    '''调整采样频率'''
+    resampleFreq = '1T' # None, '1s','1T','1H','1D'
+    '''打开回测模式'''
+    backTest = True
 
-    processes.append(Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, stockCodes, futuresCodes, initial_cash, analysis_q, isReady, debug)))
+    # startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest,resampleFreq = ('2024-06-28',
+    #                                                                                                          '2024-06-28',
+    #                                                                                                          122015869,
+    #                                                                                                         # 132315869,
+    #                                                                                                          ['2618'],
+    #                                                                                                          ['HSF1'],
+    #                                                                                                          10000000,
+    #                                                                                                          1000000,
+    #                                                                                                          False,
+    #                                                                                                          True,
+    #                                                                                                          '1T')# None, '1s','1T','1H','1D'
+    fds = FutureDataService(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest,resampleFreq, isReady)
+    mds = MarketDataService(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest,resampleFreq, isReady)
     
-    for p in processes:
-        p.start()
-        #time.sleep(1)  # Ensure processes start in sequence to avoid race conditions
+    Process(name='uds', target=UnifiedDataService, args=(mds,fds)).start()
+    # Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)).start()
+    Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)).start()
+    Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)).start()
+
+    Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, stockCodes, futuresCodes, initial_cash, analysis_q, isReady, debug)).start()
+
+    # # try:
+    # if futuresCodes == []:
+    #     processes.append(Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, isReady)))
+    #     processes.append(Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)))
+    # elif stockCodes == []:
+    #     processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
+    #     processes.append(Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)))
+    # else:
+    #     processes.append(Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, isReady)))
+    #     processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
+    #     processes.append(Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)))
+    #     processes.append(Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)))
+
+    # processes.append(Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, stockCodes, futuresCodes, initial_cash, analysis_q, isReady, debug)))
+    
+    # for p in processes:
+    #     p.start()
+    #     #time.sleep(1)  # Ensure processes start in sequence to avoid race conditions
 
     net_worth_list = []
     timestamps = []
@@ -139,15 +180,15 @@ def back_test_analysis():
             dcc.Input(id='end_date', value='20240628', type='text', style={'margin-bottom': '10px'}),
             html.Label('Start Time', style={'font-weight': 'bold'}),
             # should be int
-            dcc.Input(id='start_time', value=132015869, type='number', style={'margin-bottom': '10px'}),
+            dcc.Input(id='start_time', value=122015869, type='number', style={'margin-bottom': '10px'}),
             html.Label('Initial Cash', style={'font-weight': 'bold'}),
             dcc.Input(id='initial_cash', value=1000000, type='number', style={'margin-bottom': '10px'}),
             html.Label('Play Speed', style={'font-weight': 'bold'}),
             dcc.Input(id='play_speed', value=1000000, type='number', style={'margin-bottom': '10px'}),
             html.Label('ticker1', style={'font-weight': 'bold'}),
-            dcc.Input(id='ticker1', value='2610', type='text', style={'margin-bottom': '10px'}),
+            dcc.Input(id='ticker1', value='2618', type='text', style={'margin-bottom': '10px'}),
             html.Label('ticker2', style={'font-weight': 'bold'}),
-            dcc.Input(id='ticker2', value='NEF1', type='text', style={'margin-bottom': '10px'}),
+            dcc.Input(id='ticker2', value='NSF1', type='text', style={'margin-bottom': '10px'}),
             html.Button('Run Backtest', id='run_backtest', n_clicks=0, style={'background-color': '#4CAF50', 'color': 'white', 'padding': '10px', 'border': 'none', 'cursor': 'pointer', 'font-weight': 'bold', 'float': 'right'}),
 
             # todo: BackTest按钮

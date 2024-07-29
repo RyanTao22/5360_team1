@@ -13,8 +13,8 @@ from multiprocessing import Queue
 
 import pandas as pd
 
-from QuantStrategy import QuantStrategy, InDevelopingStrategy
-#from QuantStrategy import QuantStrategy, dummyStrategy
+#from QuantStrategy import QuantStrategy, InDevelopingStrategy
+from QuantStrategy import QuantStrategy, SampleDummyStrategy, InDevelopingStrategy
 from uuid import uuid1
 from datetime import datetime
 
@@ -52,7 +52,7 @@ class TradingPlatform:
         self.isReady = isReady
         self.debug = debug
         self.stockCodes_full = MarketDataServiceConfig.stockCodes
-        self.futuresCodes_full = MarketDataServiceConfig.futureCodes
+        self.futuresCodes_full = MarketDataServiceConfig.futuresCodes
         self.qMapping:Mapping[str,Queue] = {stock:platform_2_exchSim_order_q for stock in stockCodes}
         self.qMapping.update({futures:platform_2_futuresExchSim_order_q for futures in futuresCodes})
 
@@ -71,10 +71,16 @@ class TradingPlatform:
         ######init strat
         strat = InDevelopingStrategy(
             stratID="dummy1",stratName="dummy1",stratAuthor="hongsongchou",day="20230706",
-            ticker=[self.stockCodes[0],self.futureCodes[0]],tickers2Snapshots=self.tickers2Snapshots,
+            ticker=[self.stockCodes[0],self.futuresCodes[0]],tickers2Snapshots=self.tickers2Snapshots,
             orderManager=self.orderManager,
             initial_cash=initial_cash,analysis_queue=analysis_q            
         )
+        # strat = SampleDummyStrategy(
+        #     stratID="dummy2",stratName="dummy2",stratAuthor="hongsongchou",day="20230706",
+        #     ticker=[self.stockCodes[0],self.futuresCodes[0]],tickers2Snapshots=self.tickers2Snapshots,
+        #     orderManager=self.orderManager,
+        #     initial_cash=initial_cash,analysis_queue=analysis_q
+        # )
 
         self.quantStrats:Mapping[str,QuantStrategy] = {
             strat.getStratID():strat
@@ -136,7 +142,7 @@ class TradingPlatform:
         while True:
             res:OrderBookSnapshot_FiveLevels = marketData_2_platform_q.get()
             # print('[%d] Platform.on_md' % (os.getpid()))
-            # print(res.outputAsDataFrame())
+            print(res.outputAsDataFrame())
 
             
             '''判断数据是否都更新完成'''

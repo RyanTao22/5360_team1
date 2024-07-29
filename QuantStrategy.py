@@ -63,6 +63,7 @@ class SampleDummyStrategy(QuantStrategy):
 
         self.analysis_q = analysis_queue
         self.execution_record = []
+        self.ticker = ticker
         
         self.positions = {self.ticker[0]:[0], self.ticker[1]: [0]}
         self.cash = [initial_cash]
@@ -76,8 +77,8 @@ class SampleDummyStrategy(QuantStrategy):
         self.timestamp = []
 
     def run(self,execution:SingleStockExecution)->list[SingleStockOrder]:
-        ticker1 = "2610"
-        ticker2 = "NEF1"
+        ticker1 = self.ticker[0]
+        ticker2 = self.ticker[1]
         if execution is None:#######on receive market data
             ####get most recent market data for ticker
 
