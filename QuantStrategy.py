@@ -44,7 +44,7 @@ class QuantStrategy(Strategy):
         elif (marketData is None) and ((execution is not None) and (isinstance(execution, SingleStockExecution))):
             #handle executions
             print('[%d] Strategy.handle_execution' % (os.getpid()))
-            print(execution.outputAsArray())
+            #print(execution.outputAsArray())
             return None
         elif ((marketData is not None) and (isinstance(marketData, OrderBookSnapshot_FiveLevels))) and (execution is None):
             #handle new market data, then create a new order and send it via quantTradingPlatform.
@@ -173,7 +173,7 @@ class SampleDummyStrategy(QuantStrategy):
         else:
             #######on receive execution
             order = self.orderManager.lookupOrderID(execution.orderID)
-            print('execution!!!!!!')
+            #print('execution!!!!!!')
             print(order)
 
 
@@ -221,7 +221,7 @@ class InDevelopingStrategy(QuantStrategy):
         self.limit_cash = self.initial_cash * 0.05
         self.cashCostRatio = 0.2
         self.networth = [0]
-        self.pnl = []
+        self.pnl = [0]
         self.position = {ticker[0]:[0], ticker[1]: [0]} #这个应该是一个{}的形状
         self.ret = []
         self.current_idx = 0
@@ -716,18 +716,19 @@ class InDevelopingStrategy(QuantStrategy):
                 self.untreated_order.append(sampleOrder2.orderID)
 
                 ######return a list
-                print(sampleOrder1, sampleOrder2)
+                #print(sampleOrder1, sampleOrder2)
                 return [sampleOrder1, sampleOrder2]
         else:
             #######on receive execution
             print('execution!!!!!!')
             order = self.orderManager.lookupOrderID(execution.orderID)
+            print(order)
             if order.currStatus == 'Filled':
                 self.untreated_order.remove(order.orderID)
                 ticker, tradesize, direction, tradeprice = execution.ticker, execution.size, execution.direction, execution.price
                 print(ticker, tradesize, direction, tradeprice)
                 self.position[ticker].append(self.position[ticker][-1] + tradesize * direction)
-                self.pnl.append(self.pnl[-1] - tradesize * direction * tradeprice)
+                #self.pnl.append(self.pnl[-1] - tradesize * direction * tradeprice)
                 self.cash.append(self.cash[-1] - tradesize * direction * tradeprice)
                 self.execution_record.append({
                     'timestamp': execution.timeStamp,

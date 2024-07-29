@@ -134,7 +134,7 @@ class ExchangeSimulator:
         self.loopUntilReady()
         logger.info("Start Listening for Order")
         while True:
-#             print('[%d]ExchSim.on_order' % (os.getpid()))
+            print('[%d]ExchSim.on_order' % (os.getpid()))
             res:SingleStockOrder = platform_2_exchSim_order_q.get()
 
             ##############check order validity
@@ -149,7 +149,7 @@ class ExchangeSimulator:
                 exchSim_2_platform_execution_q.put(res)
 
 
-#             # print(res.outputAsArray())
+            #print(res.outputAsArray())
             ticker = str(res.ticker)
             mgr,commandQ = self.mgrBundle.get(ticker)
             cmdCls = self.supportedOrderCommand.get(res.type)
@@ -160,11 +160,11 @@ class ExchangeSimulator:
     def produce_execution(self, mgr_2_exchSim:Queue, exchSim_2_platform_execution_q):
         self.loopUntilReady()
         while True:
-#             print('[%d]ExchSim.produce_execution' % (os.getpid()))
+            print('[%d]ExchSim.produce_execution' % (os.getpid()))
             execution:SingleStockExecution = mgr_2_exchSim.get()
             #########supposingly we need to maintain a list of trading platforms
 
             logger.info(f"Produce Execution {execution}")
             exchSim_2_platform_execution_q.put(execution)
-#             print(execution.outputAsArray())
+            #print(execution.outputAsArray())
 

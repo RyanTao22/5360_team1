@@ -142,7 +142,7 @@ class TradingPlatform:
         while True:
             res:OrderBookSnapshot_FiveLevels = marketData_2_platform_q.get()
             # print('[%d] Platform.on_md' % (os.getpid()))
-            print(res.outputAsDataFrame())
+            #print(res.outputAsDataFrame())
 
             
             '''判断数据是否都更新完成'''
@@ -171,7 +171,7 @@ class TradingPlatform:
                     self.qMapping.get(order.ticker).put(order)
             if self.debug:
                 logger.info(f"{self.orderManager}")
-                # self.orderManager.displayOrders()
+                self.orderManager.displayOrders()
     
     def handle_execution(self, exchSim_2_platform_execution_q):
         # print('[%d]Platform.handle_execution' % (os.getpid(),))
@@ -189,11 +189,11 @@ class TradingPlatform:
                 if order.type in ("MO","LO"):
                     order.exOrderID = obj.exOrderID
                     logger.info(f"Exchange accepted orderID={order.orderID} with exOrderID={order.exOrderID}")
-                    # print(f'Order {order.orderID} has been validated by the exchange, the exchangeID is {obj.exOrderID}')
+                    print(f'Order {order.orderID} has been validated by the exchange, the exchangeID is {obj.exOrderID}')
                 self.orderManager.trackOrder(order)
                 logger.info(f"Updated Order {self.orderManager.lookupOrderID(order.orderID)}")
                 if self.debug:
-                    # self.orderManager.displayOrders()
+                    self.orderManager.displayOrders()
                     logger.info(f"Current Order Manager Inventory {self.orderManager}")
             elif isinstance(obj,SingleStockExecution):
                 execution: SingleStockExecution = obj
