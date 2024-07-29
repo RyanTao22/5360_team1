@@ -178,6 +178,7 @@ class SampleDummyStrategy(QuantStrategy):
 
 
             '''记录持仓'''
+            if execution.price is None and execution.size is None: return [] ######CANCEL order will produce an execution with None price and None size
             ticker, tradesize, direction, tradeprice = execution.ticker, execution.size, execution.direction,execution.price
             self.execution_record.append({
                 'timestamp': execution.timeStamp,
