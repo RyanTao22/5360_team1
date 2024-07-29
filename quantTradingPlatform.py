@@ -51,8 +51,8 @@ class TradingPlatform:
         self.recentUpeateTimestamp = None
         self.isReady = isReady
         self.debug = debug
-        self.stockCodes = stockCodes = MarketDataServiceConfig.stockCodes
-        self.futuresCodes = futuresCodes = MarketDataServiceConfig.futureCodes
+        self.stockCodes_full = MarketDataServiceConfig.stockCodes
+        self.futuresCodes_full = MarketDataServiceConfig.futureCodes
         self.qMapping:Mapping[str,Queue] = {stock:platform_2_exchSim_order_q for stock in stockCodes}
         self.qMapping.update({futures:platform_2_futuresExchSim_order_q for futures in futuresCodes})
 
@@ -71,7 +71,7 @@ class TradingPlatform:
         ######init strat
         strat = InDevelopingStrategy(
             stratID="dummy1",stratName="dummy1",stratAuthor="hongsongchou",day="20230706",
-            ticker=["2610","NEF1"],tickers2Snapshots=self.tickers2Snapshots,
+            ticker=[self.stockCodes[0],self.futureCodes[0]],tickers2Snapshots=self.tickers2Snapshots,
             orderManager=self.orderManager,
             initial_cash=initial_cash,analysis_queue=analysis_q            
         )
