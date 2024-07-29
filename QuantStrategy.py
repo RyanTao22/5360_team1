@@ -229,7 +229,7 @@ class InDevelopingStrategy(QuantStrategy):
         self.lastdirection2 = 0
         self.stockdf = [pd.DataFrame()]
         self.futuredfQ = [pd.DataFrame()]
-        self.futuredfT = [pd.DataFrame()]
+        # self.futuredfT = [pd.DataFrame()]
         '''记录所有发出的订单'''
         self.submitted_order = [] #(ordertime, orderid, orderprice, ordersize, direction)
         '''记录未成交或者成交后有残余的订单'''
@@ -279,7 +279,7 @@ class InDevelopingStrategy(QuantStrategy):
         end_time = self.gain_datetime(df['time'].iloc[-1])
         time_data = self.gain_timeindex(start_time, end_time)
 
-        df['time_trans'] = df['time'].astype('str').str.zfill(9).apply(lambda x: x[:2] + ':' + x[2:4])
+        df['time_trans'] = df['time'].astype('str').str.zfill(9).apply(lambda x: x[:2]  + x[2:5])
         df['lastPx'] = df['lastPx'].fillna(method='ffill')
         df_min = pd.DataFrame()
         grouped = df.groupby('time_trans')
@@ -307,24 +307,26 @@ class InDevelopingStrategy(QuantStrategy):
                   'askSize5','askSize4','askSize3','askSize2','askSize1', \
                   'bidSize1','bidSize2','bidSize3','bidSize4','bidSize5']
 
-
+        
         for col in cols:
             df_min[col] = grouped[col].last()
+        # print(df_min)
         df_min = df_min.reindex(time_data)
+        # print(df_min)
         df_min.index.name = 'time'
         df_min.reset_index(inplace=True)
         return df_min
 
-    def future_dataprocess(self, rawFutureQ, rawFutureT):
+    def future_dataprocess(self, rawFutureQ):
         '''处理期货数据'''
         # 盘口数据
         df_Quotes = rawFutureQ.copy()
         df_Quotes = df_Quotes.reset_index(drop=True)
         #print(df_Quotes)
-        start_time = self.gain_datetime(df_Quotes['time'][0])
-        end_time = self.gain_datetime(df_Quotes['time'][-1])
+        start_time = self.gain_datetime(df_Quotes['time'].iloc[0])
+        end_time = self.gain_datetime(df_Quotes['time'].iloc[-1])
         time_data_ft = self.gain_timeindex(start_time, end_time)
-        df_Quotes['time_trans'] = df_Quotes['time'].astype('str').str.zfill(9).apply(lambda x: x[:2] + ':' + x[2:4])
+        df_Quotes['time_trans'] = df_Quotes['time'].astype('str').str.zfill(9).apply(lambda x: x[:2] + x[2:5])
 
         df_Quotes_min = pd.DataFrame()
         grouped = df_Quotes.groupby('time_trans')
@@ -336,25 +338,25 @@ class InDevelopingStrategy(QuantStrategy):
         df_Quotes_min = df_Quotes_min.reindex(time_data_ft)
 
         # 成交数据
-        df_Trades = rawFutureT.copy()
-        df_Trades = df_Trades.reset_index(drop=True)
-        start_time = self.gain_datetime(df_Trades['Time'][0])
-        end_time = self.gain_datetime(df_Trades['Time'][-1])
-        time_data_ft = self.gain_timeindex(start_time, end_time)
+        # df_Trades = rawFutureT.copy()
+        # df_Trades = df_Trades.reset_index(drop=True)
+        # start_time = self.gain_datetime(df_Trades['Time'][0])
+        # end_time = self.gain_datetime(df_Trades['Time'][-1])
+        # time_data_ft = self.gain_timeindex(start_time, end_time)
 
-        df_Trades['time'] = df_Trades['Time'].astype('str').str.zfill(9).apply(lambda x: x[:2] + ':' + x[2:4])
-        grouped = df_Trades.groupby('time')
-        df_Trades_min = pd.DataFrame()
-        df_Trades_min['totalMatchValue'] = grouped['totalMatchValue'].sum()
-        df_Trades_min['totalMatchSize'] = grouped['totalMatchSize'].sum()
-        df_Trades_min['avgMatchPx'] = df_Trades_min['totalMatchValue'] / df_Trades_min['totalMatchSize']
-        df_Trades_min['avgMatchPx'].fillna(method='ffill', inplace=True)
-        df_Trades_min = df_Trades_min.reindex(time_data_ft)
-        df_concat = pd.concat([df_Trades_min, df_Quotes_min], axis=1)
-        df_concat.index.name = 'time'
-        df_concat.reset_index(inplace=True)
-        return df_concat
-    def get_data(self, stockdf, futuredfQ, futuredfT):
+        # df_Trades['time'] = df_Trades['Time'].astype('str').str.zfill(9).apply(lambda x: x[:2] + ':' + x[2:4])
+        # grouped = df_Trades.groupby('time')
+        # df_Trades_min = pd.DataFrame()
+        # df_Trades_min['totalMatchValue'] = grouped['totalMatchValue'].sum()
+        # df_Trades_min['totalMatchSize'] = grouped['totalMatchSize'].sum()
+        # df_Trades_min['avgMatchPx'] = df_Trades_min['totalMatchValue'] / df_Trades_min['totalMatchSize']
+        # df_Trades_min['avgMatchPx'].fillna(method='ffill', inplace=True)
+        # df_Trades_min = df_Trades_min.reindex(time_data_ft)
+        # df_concat = pd.concat([df_Trades_min, df_Quotes_min], axis=1)
+        df_Quotes_min.index.name = 'time'
+        df_Quotes_min.reset_index(inplace=True)
+        return df_Quotes_min
+    def get_data(self, stockdf, futuredfQ):
 
         '''从project3的传输中得到数据
            n:需要回看的数据长度
@@ -362,7 +364,8 @@ class InDevelopingStrategy(QuantStrategy):
             返回 数据表（如果长度小于n（则要么返回现有长度，要么由于存在回看，小于说明数据量不够，无法回看，直接返回空'''
 
         processedDataStock = self.stock_dataprocess(stockdf)
-        processedDataFuture = self.future_dataprocess(futuredfQ, futuredfT)
+        processedDataFuture = self.future_dataprocess(futuredfQ)
+        # print(processedDataFuture)
         return processedDataStock, processedDataFuture
     def generate_signal_copula(self, df_stock, df_future, past_step, valid_min, trust_prob=0.7, op_last=None, base='future'):
 
@@ -382,21 +385,23 @@ class InDevelopingStrategy(QuantStrategy):
             2: Close all positions
         '''
 
-        if len(df_stock) < past_step or len(df_future) < past_step:
-            return
+        if len(df_stock) < past_step + valid_min or len(df_future) < past_step + valid_min:
+            # print('数据不够')
+            return 0
         
         df_stock[f'return_{valid_min}_stock'] = np.log(1 + df_stock['close'].pct_change(periods=valid_min))
-        df_future[f'return_{valid_min}_future'] = np.log(1 + df_future['avgMatchPx'].pct_change(periods=valid_min))
+        # print(df_stock)
+        df_future[f'return_{valid_min}_future'] = np.log(1 + df_future.eval('(askPrice1 + bidPrice1) / 2').pct_change(periods=valid_min))
         return_df = pd.merge(df_stock[['time',f'return_{valid_min}_stock']], df_future[['time',f'return_{valid_min}_future']], on='time', how='inner')
-        return_df = return_df.dropna().reset_index(drop=True)
-        
+        # return_df = return_df.dropna().reset_index(drop=True)
         op_lis = []
         sign_record = []
 
         time = return_df['time'].iloc[-1]
+        # print(time)
 
-        if int(time[-2:])%valid_min != 0:
-            return
+        # if int(time[-2:])%valid_min != 0:
+        #     return 0
 
         ret_stock = return_df[f'return_{valid_min}_stock'][-past_step:]
         ret_future = return_df[f'return_{valid_min}_future'][-past_step:]
@@ -404,12 +409,13 @@ class InDevelopingStrategy(QuantStrategy):
         Ustock = norm.cdf(ret_stock, np.mean(ret_stock), np.std(ret_stock))
         Ufuture = norm.cdf(ret_future, np.mean(ret_future), np.std(ret_future))
         u = np.vstack((Ustock, Ufuture)).T
-
+        if np.isnan(u).any():
+            return 0
         cop1 = GaussianCopula(dim=2)
         cop2 = ClaytonCopula(dim=2)
         cop3 = GumbelCopula(dim=2)
         cop4 = FrankCopula(dim=2)
-
+        # print(u)
         cop1.fit(u, method='ml')
         cop2.fit(u, method='ml')
         cop3.fit(u, method='ml')
@@ -436,78 +442,36 @@ class InDevelopingStrategy(QuantStrategy):
                 sign = numerator
             
             return sign
-
-        # ticker1 = self.ticker[0]
-        # ticker2 = self.ticker[1]
-        # stockPosition = self.position[ticker1][-1]
-        # futurePosition = self.position[ticker2][-1]
-
-        # if base == 'future':
-        #     stockPosition
-
-
+        print('set op')
         if base == 'future':
-            if op_last is None:
-                op = 1 if gain_sign(base) < 1-trust_prob else -1 if gain_sign(base) > trust_prob else 0
-                op_last = op
-            else:
-
-                op = 1 if gain_sign(base) < 1-trust_prob else -1 if gain_sign(base) > trust_prob else 0
-                
-                if op != 0 and op == op_last: 
-                    op = 0
-                elif op == 0 and op != op_last: 
-                    op = 2 # close
-                    op_last = 0
-                else:
-                    op_last = op
-
+            op = 1 if gain_sign(base) < 1-trust_prob else -1 if gain_sign(base) > trust_prob else 0
         elif base == 'stock':
-            if op_last is None:
-                op = -1 if gain_sign(base) < 1-trust_prob else 1 if gain_sign(base) > trust_prob else 0
-                op_last = op
-            else:
-                op = -1 if gain_sign(base) < 1-trust_prob else 1 if gain_sign(base) > trust_prob else 0
-                
-                if op != 0 and op == op_last: 
-                    op = 0
-                elif op == 0 and op != op_last: 
-                    op = 2 # close
-                    op_last = 0
-                else:
-                    op_last = op
-
-        sign_record.append({"time":time,"sign":gain_sign(base)})
+            op = -1 if gain_sign(base) < 1-trust_prob else 1 if gain_sign(base) > trust_prob else 0
+        
         op_lis.append({"time":time,"op":op})
-        op_df = pd.DataFrame(op_lis)
-
-        return op_df, op_last
+        
+        
+        return op
     
 
-    def generate_signal_cointegration(self, df_stock, df_future, past_step, smooth_min, bounds=[1,2], op_last=None):
+    def generate_signal_cointegration(self, df_stock, df_future, past_step, sign_last, smooth_min, bounds=[1,2], op_last=None):
 
         '''
         生成策略相关信号,每个tick开始时回看past_step个分钟,每次只传入一对股票期货对
         Input
             past_step: 回看分钟数
             smooth_min: 平滑分钟数
-            op_last: 最新的一次操作
+            sign_last: 最近的sign
+            op_last: 最近的操作
             bounds: 协整法判断的两个值域
         Output
             op
-            1: Buy stock, sell future
-            0: No act
-            -1: Sell stock, buy future
-            2: Close all positions
+                1: Buy stock, sell future
+                0: No act
+                -1: Sell stock, buy future
+                2: Close all positions when mean reversion
+                4: Forced closing
         '''
-        """
-        op
-            1: Buy stock, sell future
-            0: No act
-            -1: Sell stock, buy future
-            2: Close all positions when mean reversion
-            4: Forced closing
-        """
 
         if len(df_stock) < past_step or len(df_future) < past_step:
             return
@@ -525,8 +489,7 @@ class InDevelopingStrategy(QuantStrategy):
         df_price = pd.merge(df_stock[['time', f'lnP_ma{smooth_min}_stock']], df_future[['time',f'lnP_ma{smooth_min}_future']], on='time', how='inner')
         df_price = df_price.dropna().reset_index(drop=True)
 
-        op = []
-        sign_record = []
+
         time = df_price['time'].iloc[-1]
         model = LinearRegression()
         x = [x for x in df_price[-past_step:][f'lnP_ma{smooth_min}_future']]
@@ -539,35 +502,32 @@ class InDevelopingStrategy(QuantStrategy):
         resid_std = np.std(resids)
         sign = resids[-1]/resid_std
 
-        if op_last is None:     
+        op = []
+
+        if sign_last is None:
             sign_record.append({"time":time,"sign":sign})
-            op.append({"time":time,"op":0})
-            op_last = 0
         else:
-            sign_last = sign_record[-1]['sign']
             if sign_last > lower_bound and sign <= lower_bound and sign > 0:
                 op.append({"time":time,"op":1})
                 op_last = 1
-
+                
             elif sign_last < -lower_bound and sign >= -lower_bound and sign < 0:
                 op.append({"time":time,"op":-1})
                 op_last = -1
-            
+
             elif abs(op_last)==1 and abs(sign) >= upper_bound:
                 op.append({"time":time,"op":4})
                 op_last = 0
-            
+
             elif abs(op_last)==1 and sign*sign_last<0:
-                op.append({"time":time,"op":2})
+                op.append({"time":time,"op":2}) 
                 op_last = 0
             else:
-                op.append({"time":time,"op":0})
-            
-            sign_record.append({"time":time,"sign":sign})
+                op.append({"time":time,"op": op_last})
                     
         sign_record = pd.DataFrame(sign_record)
         op = pd.DataFrame(op)
-        return op, op_last
+        return op, sign, op_last
 
 
     def run(self, execution: SingleStockExecution) -> list[SingleStockOrder]:
@@ -579,7 +539,8 @@ class InDevelopingStrategy(QuantStrategy):
 
             ticker1MarketData:list[pd.DataFrame] = self.tickers2Snapshots['stocks'][ticker1]
             ticker2MarketData:list[pd.DataFrame] = self.tickers2Snapshots['futures_quotes'][ticker2]
-            ticker2MarketData_trades:list[pd.DataFrame] = self.tickers2Snapshots['futures_trades'][ticker2]
+            # ticker2MarketData_trades:list[pd.DataFrame] = self.tickers2Snapshots['futures_trades'][ticker2]
+            # print(len(ticker2MarketData_trades))
 
             ticker1RecentMarketData = None
             ticker2RecentMarketData = None
@@ -598,7 +559,7 @@ class InDevelopingStrategy(QuantStrategy):
                     ticker1RecentMarketData['time'].astype(str)))
                 # self.timestamp.append(pd.to_datetime(ticker1RecentMarketData['date']  + ticker1RecentMarketData['time']))
                 # 将新信息存储到历史表列表中
-                self.stockdf.append(ticker1RecentMarketData)
+                self.stockdf.append(ticker1RecentMarketData.copy())
 
             if len(ticker2MarketData) > 0:
                 flag += 1
@@ -612,15 +573,16 @@ class InDevelopingStrategy(QuantStrategy):
                 self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date']) + pd.to_timedelta(
                     ticker2RecentMarketData['time'].astype(str)))
                 # self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'] + ticker2RecentMarketData['time']))
-                self.futuredfQ.append(ticker2RecentMarketData)
+                self.futuredfQ.append(ticker2RecentMarketData.copy())
 
-            if len(ticker2MarketData_trades) > 0:
-                flag += 1
-                ticker2RecentMarketData = ticker2MarketData_trades[-1]
-                # 更新trade表
-                self.futuredfT.append(ticker2RecentMarketData)
-            
-            '''使用更新后的价格计算净值'''
+            # if len(ticker2MarketData_trades) > 0:
+            #     flag += 1
+            #     ticker2RecentMarketData = ticker2MarketData_trades[-1]
+            #     # 更新trade表
+            #     self.futuredfT.append(ticker2RecentMarketData.copy())
+                
+            # print(len(self.stockdf), len(self.futuredfQ), len(self.futuredfT))
+           
             netWrorth = self.cash[-1]
             if len(self.positions[ticker1]) > 0:
                 netWrorth += self.positions[ticker1][-1] * self.midPrices[ticker1][-1]
@@ -640,18 +602,21 @@ class InDevelopingStrategy(QuantStrategy):
                 'midPrice_' + ticker2: self.midPrices[ticker2][-1]
             })
             
-
-            if len(self.stockdf) > 1 and len(self.futuredfQ) > 1 and len(self.futuredfT) > 1:
+            
+            if len(self.stockdf) > 1 and len(self.futuredfQ) > 1:
                 #########do some calculation with the recent market data
                 # .....
+                
                 stock_df = pd.concat(self.stockdf)
                 future_dfQ = pd.concat(self.futuredfQ) 
-                future_dfT = pd.concat(self.futuredfT)
-                df1, df2 = self.get_data(stock_df, future_dfQ,
-                                         future_dfT)
+                # print(len(stock_df), len(future_dfQ))
+                # future_dfT = pd.concat(self.futuredfT)
+                df1, df2 = self.get_data(stock_df, future_dfQ)
+                                        
 
-                order = self.generate_signal(df1, df2, 10)['op']
-                print('order:----------------------------------------------------------------', order)
+                order = self.generate_signal_copula(df1, df2, 5, valid_min = 3, trust_prob=0.7, op_last=None, base='future')
+                if order != 0:
+                    print('order:----------------------------------------------------------------', order)
                 
                 ordersizeStock, ordersizeFutures, direction_stock, direction_futures = 0, 0, 0, 0
                 if order == 1:

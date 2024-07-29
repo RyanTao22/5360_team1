@@ -55,7 +55,7 @@ if __name__ == '__main__':
     ##########v2
     # startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest = ('2024-06-28',
     #                                                                                                          '2024-06-28',
-    #                                                                                                          132315869,
+    #                                                                                                          #132315869,
     #                                                                                                          ['2610'],
     #                                                                                                          ['NEF1'],
     #                                                                                                          10000000,
@@ -74,6 +74,7 @@ if __name__ == '__main__':
     startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest = ('2024-06-28',
                                                                                                              '2024-06-28',
                                                                                                              122015869,
+                                                                                                            # 132315869,
                                                                                                              ['2610'],
                                                                                                              ['NEF1'],
                                                                                                              10000000,
