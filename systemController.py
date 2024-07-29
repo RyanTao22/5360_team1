@@ -79,8 +79,8 @@ def calculate_indicators(net_worth_list, baseline_networth, initial_cash, timest
 
 def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest):
     
-    stockCodes = MarketDataServiceConfig.stockCodes
-    futuresCodes = MarketDataServiceConfig.futuresCodes
+    # stockCodes = MarketDataServiceConfig.stockCodes
+    # futuresCodes = MarketDataServiceConfig.futuresCodes
 
     marketData_2_exchSim_q = Queue()
     marketData_2_platform_q = Queue()
@@ -180,7 +180,7 @@ def back_test_analysis():
             dcc.Input(id='end_date', value='20240628', type='text', style={'margin-bottom': '10px'}),
             html.Label('Start Time', style={'font-weight': 'bold'}),
             # should be int
-            dcc.Input(id='start_time', value=122015869, type='number', style={'margin-bottom': '10px'}),
+            dcc.Input(id='start_time', value=132015869, type='number', style={'margin-bottom': '10px'}),
             html.Label('Initial Cash', style={'font-weight': 'bold'}),
             dcc.Input(id='initial_cash', value=1000000, type='number', style={'margin-bottom': '10px'}),
             html.Label('Play Speed', style={'font-weight': 'bold'}),

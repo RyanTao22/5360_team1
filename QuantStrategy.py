@@ -168,10 +168,13 @@ class SampleDummyStrategy(QuantStrategy):
 
 
                 ######return a list
+                print(sampleOrder1,sampleOrder2)
                 return [sampleOrder1,sampleOrder2]
         else:
             #######on receive execution
             order = self.orderManager.lookupOrderID(execution.orderID)
+            print('execution!!!!!!')
+            print(order)
 
 
             '''记录持仓'''
@@ -389,11 +392,11 @@ class InDevelopingStrategy(QuantStrategy):
         if len(df_stock) < past_step + valid_min or len(df_future) < past_step + valid_min:
             # print('数据不够')
             return 0
-        
         df_stock[f'return_{valid_min}_stock'] = np.log(1 + df_stock['close'].pct_change(periods=valid_min))
         # print(df_stock)
         df_future[f'return_{valid_min}_future'] = np.log(1 + df_future.eval('(askPrice1 + bidPrice1) / 2').pct_change(periods=valid_min))
         return_df = pd.merge(df_stock[['time',f'return_{valid_min}_stock']], df_future[['time',f'return_{valid_min}_future']], on='time', how='inner')
+        # print(return_df)
         # return_df = return_df.dropna().reset_index(drop=True)
         op_lis = []
         sign_record = []
@@ -415,16 +418,16 @@ class InDevelopingStrategy(QuantStrategy):
         cop1 = GaussianCopula(dim=2)
         cop2 = ClaytonCopula(dim=2)
         cop3 = GumbelCopula(dim=2)
-        cop4 = FrankCopula(dim=2)
+        # cop4 = FrankCopula(dim=2)
         # print(u)
         cop1.fit(u, method='ml')
         cop2.fit(u, method='ml')
         cop3.fit(u, method='ml')
-        cop4.fit(u, method='ml')
+        # cop4.fit(u, method='ml')
 
-        loglik_lis = [cop1.log_lik(u),cop2.log_lik(u),cop3.log_lik(u),cop4.log_lik(u)]
+        loglik_lis = [cop1.log_lik(u),cop2.log_lik(u),cop3.log_lik(u)] #,cop4.log_lik(u)
         max_id = loglik_lis.index(max(loglik_lis))
-        cop = [cop1,cop2,cop3,cop4][max_id]
+        cop = [cop1,cop2,cop3][max_id] #cop4
 
         ret_stock_pred = return_df[f'return_{valid_min}_stock'].iloc[-1] 
         ret_future_pred = return_df[f'return_{valid_min}_future'].iloc[-1]  
@@ -615,10 +618,10 @@ class InDevelopingStrategy(QuantStrategy):
                 df1, df2 = self.get_data(stock_df, future_dfQ)
                                         
 
-                order = self.generate_signal_copula(df1, df2, 5, valid_min = 3, trust_prob=0.7, op_last=None, base='future')
+                order = self.generate_signal_copula(df1, df2, 10, valid_min = 3, trust_prob=0.7, op_last=None, base='future')
+            
                 if order != 0:
                     print('order:----------------------------------------------------------------', order)
-                
                 ordersizeStock, ordersizeFutures, direction_stock, direction_futures = 0, 0, 0, 0
                 if order == 1:
                     direction_stock, direction_futures = 1, -1
@@ -642,37 +645,43 @@ class InDevelopingStrategy(QuantStrategy):
 
                 if self.cash[-1] <= self.limit_cash and order != 2:
                     print('cash is not enough')
-                    cash_stock = 0
-                    cash_future = 0
                     return []
                 else:
                     cash_stock = self.cash[-1] * self.cashCostRatio // 2
                     cash_future = self.cash[-1] * self.cashCostRatio // 2
-                if direction_stock > 0:
-                    if ordersizeStock == 0:
-                        ordersizeStock = cash_stock // stock_df.iloc[-1,]['askPrice1']
-                    odprice = stock_df.iloc[-1,]['askPrice1']
-                elif direction_stock < 0:
-                    if ordersizeStock == 0:
-                        ordersizeStock = cash_stock // stock_df.iloc[-1,]['bidPrice1']
-                    odprice = stock_df.iloc[-1,]['bidPrice1']
-                else:
-                    ordersizeStock = 0
-                    odprice = 0
+                # if direction_stock > 0:
+                #     if ordersizeStock == 0:
+                #         ordersizeStock = cash_stock // stock_df.iloc[-1,]['askPrice1']
+                #     odprice = stock_df.iloc[-1,]['askPrice1']
+                # elif direction_stock < 0:
+                #     if ordersizeStock == 0:
+                #         ordersizeStock = cash_stock // stock_df.iloc[-1,]['bidPrice1']
+                #         # print(stock_df.iloc[-1,]['bidPrice1'], ordersizeStock)
+                #     odprice = stock_df.iloc[-1,]['bidPrice1']
+                # else:
+                #     ordersizeStock = 0
+                #     odprice = 0
 
-                if direction_futures > 0:
-                    if ordersizeFutures == 0:
-                        ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['askPrice1']
-                    odpriceF = future_dfQ.iloc[-1,]['askPrice1']
-                elif direction_futures < 0:
-                    if ordersizeFutures == 0:
-                        ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['bidPrice1']
-                    odpriceF = future_dfQ.iloc[-1,]['bidPrice1']
-                else:
-                    ordersizeFutures = 0
-                    odpriceF = 0
+                # if direction_futures > 0:
+                #     if ordersizeFutures == 0:
+                #         ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['askPrice1']
+                #         # print(future_dfQ.iloc[-1,]['askPrice1'],ordersizeFutures)
+                #     odpriceF = future_dfQ.iloc[-1,]['askPrice1']
+                # elif direction_futures < 0:
+                #     if ordersizeFutures == 0:
+                #         ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['bidPrice1']
+                #     odpriceF = future_dfQ.iloc[-1,]['bidPrice1']
+                # else:
+                #     ordersizeFutures = 0
+                #     odpriceF = 0
+                if direction_stock != 0:
+                    ordersizeStock = 1
+                if direction_futures != 0:
+                    ordersizeFutures = 1
                 if ordersizeFutures == 0 and ordersizeStock == 0:
+                    print(2)
                     return []
+                # print(ordersizeStock, ordersizeFutures)
                 from datetime import datetime
                 now = datetime.now()
                 sampleOrder1 = SingleStockOrder(
@@ -707,13 +716,16 @@ class InDevelopingStrategy(QuantStrategy):
                 self.untreated_order.append(sampleOrder2.orderID)
 
                 ######return a list
+                print(sampleOrder1, sampleOrder2)
                 return [sampleOrder1, sampleOrder2]
         else:
             #######on receive execution
+            print('execution!!!!!!')
             order = self.orderManager.lookupOrderID(execution.orderID)
             if order.currStatus == 'Filled':
                 self.untreated_order.remove(order.orderID)
                 ticker, tradesize, direction, tradeprice = execution.ticker, execution.size, execution.direction, execution.price
+                print(ticker, tradesize, direction, tradeprice)
                 self.position[ticker].append(self.position[ticker][-1] + tradesize * direction)
                 self.pnl.append(self.pnl[-1] - tradesize * direction * tradeprice)
                 self.cash.append(self.cash[-1] - tradesize * direction * tradeprice)
@@ -753,6 +765,7 @@ class InDevelopingStrategy(QuantStrategy):
                             sampleOrder3.type = "CANCEL"
                             cancelOrders.append(sampleOrder3)
                 elif order.currStatus == "PartiallyFilled":
+                    print('partially filled')
                     from datetime import datetime
                     now = datetime.now()
                     sampleOrder3 = order.copyOrder()

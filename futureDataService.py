@@ -306,7 +306,7 @@ class FutureDataService:
         self.tqcData.sort_values(by=['date', 'time'], ascending=True, inplace=True)
 
         if resampleFreq != None:
-            self.tqcData.index = a.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
+            self.tqcData.index = self.tqcData.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
             self.tqcData = self.tqcData.resample(resampleFreq).last()
             self.tqcData.dropna(inplace=True)
             self.tqcData.reset_index(drop = True,inplace=True)

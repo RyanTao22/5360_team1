@@ -68,7 +68,7 @@ class TradingPlatform:
 
         self.stockCodes = stockCodes
         self.futuresCodes = futuresCodes
-        ######init strat
+        #####init strat
         strat = InDevelopingStrategy(
             stratID="dummy1",stratName="dummy1",stratAuthor="hongsongchou",day="20230706",
             ticker=[self.stockCodes[0],self.futuresCodes[0]],tickers2Snapshots=self.tickers2Snapshots,
@@ -156,7 +156,9 @@ class TradingPlatform:
 
             for strat in self.tickers2Strats[res.ticker]:
                 stratOut = strat.run(None)
-                if stratOut is None: continue ####
+                if stratOut is None: 
+                    print('get order')
+                    continue ####
                 if isinstance(stratOut,SingleStockOrder):
                     stratOut:list[SingleStockOrder] = [stratOut]
                 for order in stratOut:
@@ -178,6 +180,7 @@ class TradingPlatform:
         while True:
             obj = exchSim_2_platform_execution_q.get()
             if isinstance(obj,SingleStockOrder):
+                print('get order')
                 order = self.orderManager.lookupOrderID(obj.orderID)
                 if obj.currStatus == "Rejected":
                     order.currStatus = "Rejected"
