@@ -180,7 +180,8 @@ class OrderBookManager:
 
 
     def getBest(self,pq:PriorityQueue) -> SingleStockOrder:
-        return pq.queue[0][2]
+        if len(pq.queue) > 0 : return pq.queue[0][2]
+        return None
 
     def getTotalAskOrderSize(self):
         return sum([o.size for _,_,o in self.__askQ.queue])
@@ -217,6 +218,7 @@ class OrderBookManager:
             pq.get()
             self.__orders.pop(order.exOrderID,None)
             order = self.getBest(pq)
+            if order is None: break
         self.__orders = {k:v for k,v in self.__orders.items() if v.size > 0}
         self.__stopOrders = {k:v for k,v in self.__stopOrders.items() if v.size > 0}
 
