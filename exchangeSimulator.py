@@ -10,6 +10,7 @@ import os
 import time
 from uuid import uuid1
 
+
 from common.Exchange.Command import Command, MarketDataCommand, MarketOrderCommand, LimitOrderCommand, \
     CancelOrderCommand, OrderCommand
 from common.Exchange.OrderBookManager import OrderBookManager
