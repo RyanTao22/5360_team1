@@ -53,8 +53,8 @@ class TradingPlatform:
         self.debug = debug
         self.stockCodes_full = MarketDataServiceConfig.stockCodes
         self.futuresCodes_full = MarketDataServiceConfig.futuresCodes
-        self.qMapping:Mapping[str,Queue] = {stock:platform_2_exchSim_order_q for stock in stockCodes}
-        self.qMapping.update({futures:platform_2_futuresExchSim_order_q for futures in futuresCodes})
+        self.qMapping:Mapping[str,Queue] = {stock:platform_2_exchSim_order_q for stock in self.stockCodes_full}
+        self.qMapping.update({futures:platform_2_futuresExchSim_order_q for futures in self.futuresCodes_full})
 
         #Instantiate individual strategies
         # (1)
@@ -107,8 +107,8 @@ class TradingPlatform:
             print("sleep for 3 secs")
             time.sleep(3)
 
-    def isStock(self,ticker ): return ticker in self.stockCodes
-    def isFutures(self,ticker ): return ticker in self.futuresCodes
+    def isStock(self,ticker ): return ticker in self.stockCodes_full
+    def isFutures(self,ticker ): return ticker in self.futuresCodes_full
     def updateTickers2Snapshots(self,snap: OrderBookSnapshot_FiveLevels):
         if self.isStock(snap.ticker):
             self.tickers2Snapshots['stocks'][snap.ticker].append(snap.outputAsDataFrame())
@@ -239,3 +239,62 @@ class TradingPlatform:
                 print('Wrong Message')
             ##### BSJ ######
             if self.debug: self.orderManager.displayOrders()
+
+
+
+class DummyTradingPlatform(TradingPlatform):
+    def __init__(self, marketData_2_platform_q, platform_2_exchSim_order_q,platform_2_futuresExchSim_order_q,
+                 exchSim_2_platform_execution_q,stockCodes,futuresCodes,initial_cash,analysis_q,isReady=None,debug=True):
+        print("[%d]<<<<< call Platform.init" % (os.getpid(),))
+        self.recentUpeateTimestamp = None
+        self.isReady = isReady
+        self.debug = debug
+        self.stockCodes_full = MarketDataServiceConfig.stockCodes
+        self.futuresCodes_full = MarketDataServiceConfig.futuresCodes
+        self.qMapping:Mapping[str,Queue] = {stock:platform_2_exchSim_order_q for stock in self.stockCodes_full}
+        self.qMapping.update({futures:platform_2_futuresExchSim_order_q for futures in self.futuresCodes_full})
+
+        #Instantiate individual strategies
+        # (1)
+        #self.quantStrat = dict(str,QuantStrategy())
+        self.orderManager = OrderManager(debug=debug)
+        self.tickers2Snapshots: Mapping[str,list[pd.DataFrame]] = {
+            'stocks':defaultdict(lambda :[]),
+            'futures_quotes':defaultdict(lambda: []),
+            'futures_trades':defaultdict(lambda: []),
+        }
+
+        self.stockCodes = stockCodes
+        self.futuresCodes = futuresCodes
+        #####init strat
+        # strat = InDevelopingStrategy(
+        #     stratID="dummy1",stratName="dummy1",stratAuthor="hongsongchou",day="20230706",
+        #     ticker=[self.stockCodes[0],self.futuresCodes[0]],tickers2Snapshots=self.tickers2Snapshots,
+        #     orderManager=self.orderManager,
+        #     initial_cash=initial_cash,analysis_queue=analysis_q
+        # )
+        strat = SampleDummyStrategy(
+            stratID="dummy2",stratName="dummy2",stratAuthor="hongsongchou",day="20230706",
+            ticker=[self.stockCodes[0],self.futuresCodes[0]],tickers2Snapshots=self.tickers2Snapshots,
+            orderManager=self.orderManager,
+            initial_cash=initial_cash,analysis_queue=analysis_q
+        )
+
+        self.quantStrats:Mapping[str,QuantStrategy] = {
+            strat.getStratID():strat
+        }
+
+        #######maintain a mapping from ticker to strats for sending market data
+        self.tickers2Strats:Mapping[str,list[QuantStrategy]] = defaultdict(lambda : [])
+        for _,strat in self.quantStrats.items():
+            if isinstance(strat.ticker,list):
+                for t in strat.ticker:
+                    self.tickers2Strats[t] += [strat]
+            elif isinstance(strat.ticker,str):
+                self.tickers2Strats[strat.ticker] += [strat]
+
+        t_md = threading.Thread(name='platform.on_marketData', target=self.consume_marketData, args=( marketData_2_platform_q,analysis_q,))
+        t_md.start()
+
+        t_exec = threading.Thread(name='platform.on_exec', target=self.handle_execution, args=(exchSim_2_platform_execution_q, ))
+        t_exec.start()
