@@ -148,18 +148,29 @@ class MarketDataService:
     def produce_quote(self, marketData_2_exchSim_q, marketData_2_platform_q):
         print("[%d]<<<<< call MarketDataService.init" % (os.getpid(),))
         self.cData.sort_index(axis=1,inplace=True)
+
+
+        '''获取列名,避免受顺序影响'''
+        BP_cols_list = ['BP'+str(i) for i in range(1,6)]
+        SP_cols_list = ['SP'+str(i) for i in range(1,6)]
+        BV_cols_list = ['BV'+str(i) for i in range(1,6)]
+        SV_cols_list = ['SV'+str(i) for i in range(1,6)]
+
+
         for index, row in self.cData.iterrows():
             diff = float(row['ts_diff'])/1000/self.playSpeed
             now = datetime.datetime.now()
             # date should be row['date'] in a proper format as now.date() (from 2024-04-01)
             # time should be row['time'] in a proper format as now.time() (from 90515951: 09:05:15.951000)
 
+            # reorder the columns to make sure the order is correct
+
             quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, datetime.datetime.strptime(row['date'], '%Y-%m-%d'),
                                                          datetime.datetime.strptime(str(row['time']), '%H%M%S%f').time(),
-                                                         bidPrice=row["BP1":"BP5"].tolist(),
-                                                         askPrice=row["SP1":"SP5"].tolist(),
-                                                         bidSize=row["BV1":"BV5"].tolist(),
-                                                         askSize=row["SV1":"SV5"].tolist())
+                                                         bidPrice=[row[BP_cols_list[i]] for i in range(5)],
+                                                         askPrice=[row[SP_cols_list[i]] for i in range(5)],
+                                                         bidSize=[row[BV_cols_list[i]] for i in range(5)],
+                                                         askSize=[row[SV_cols_list[i]] for i in range(5)])
             quoteSnapshot.type = "both"
             quoteSnapshot.midQ = row.get("midQ")
             quoteSnapshot.symbol = row.get("symbol")
