@@ -160,7 +160,7 @@ class MarketDataService:
         self.cData.sort_index(axis=1,inplace=True)
 
         if resampleFreq != None:
-            self.cData.index = a.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
+            self.cData.index = self.cData.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
             self.cData = self.cData.resample(resampleFreq).last()
             self.cData.dropna(inplace=True)
             self.cData.reset_index(drop = True,inplace=True)
