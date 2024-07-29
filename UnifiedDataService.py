@@ -26,6 +26,13 @@ class UnifiedDataService:
             bidPrice_cols_list = ['bidPrice'+str(i) for i in range(1,6)]
             askSize_cols_list = ['askSize'+str(i) for i in range(1,6)]
             bidSize_cols_list = ['bidSize'+str(i) for i in range(1,6)]
+
+            BP_cols_list = ['BP'+str(i) for i in range(1,6)]
+            SP_cols_list = ['SP'+str(i) for i in range(1,6)]
+            BV_cols_list = ['BV'+str(i) for i in range(1,6)]
+            SV_cols_list = ['SV'+str(i) for i in range(1,6)]
+
+
             now = datetime.datetime.now()
 
             for index, row in self.fullData.iterrows():
@@ -36,10 +43,10 @@ class UnifiedDataService:
 
                     quoteSnapshot = OrderBookSnapshot_FiveLevels(row.ticker, datetime.datetime.strptime(row['date'], '%Y-%m-%d'),
                                                                  datetime.datetime.strptime(str(row['time']), '%H%M%S%f').time(),
-                                                                 bidPrice=row["BP1":"BP5"].tolist(),
-                                                                 askPrice=row["SP1":"SP5"].tolist(),
-                                                                 bidSize=row["BV1":"BV5"].tolist(),
-                                                                 askSize=row["SV1":"SV5"].tolist())
+                                                                 bidPrice=[row[BP_cols_list[i]] for i in range(5)],
+                                                                 askPrice=[row[SP_cols_list[i]] for i in range(5)],
+                                                                 bidSize=[row[BV_cols_list[i]] for i in range(5)],
+                                                                 askSize=[row[SV_cols_list[i]] for i in range(5)])
                     quoteSnapshot.type = "both"
                     quoteSnapshot.midQ = row.get("midQ")
                     quoteSnapshot.symbol = row.get("symbol")
