@@ -19,8 +19,8 @@ if __name__ == '__main__':
     ###########################################################################
     # Define all components
     ###########################################################################
-    stockCodes = MarketDataServiceConfig.stockCodes
-    futuresCodes = MarketDataServiceConfig.futuresCodes
+    # stockCodes = MarketDataServiceConfig.stockCodes
+    # futuresCodes = MarketDataServiceConfig.futuresCodes
 
     marketData_2_exchSim_q = Queue()
     marketData_2_platform_q = Queue()
