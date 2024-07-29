@@ -219,7 +219,9 @@ class InDevelopingStrategy(QuantStrategy):
         self.timestamp = []
         self.cash = [self.initial_cash]
         self.limit_cash = self.initial_cash * 0.05
-        self.cashCostRatio = 0.2
+        self.absoluteCash = self.limit_cash
+        self.lastorder = 0
+        self.cashCostRatio = 0.05
         self.networth = [0]
         self.pnl = [0]
         self.position = {ticker[0]:[0], ticker[1]: [0]} #这个应该是一个{}的形状
@@ -373,6 +375,8 @@ class InDevelopingStrategy(QuantStrategy):
         return processedDataStock, processedDataFuture
     def generate_signal_copula(self, df_stock, df_future, past_step, valid_min, trust_prob=0.7, op_last=None, base='future'):
 
+        # print(df_stock)
+
         '''
         生成策略相关信号,每个tick开始时回看past_step个分钟,每次只传入一对股票期货对
         Input
@@ -446,7 +450,7 @@ class InDevelopingStrategy(QuantStrategy):
                 sign = numerator
             
             return sign
-        print('set op')
+        # print('set op')
         if base == 'future':
             op = 1 if gain_sign(base) < 1-trust_prob else -1 if gain_sign(base) > trust_prob else 2
         elif base == 'stock':
@@ -552,7 +556,7 @@ class InDevelopingStrategy(QuantStrategy):
 
 
             if len(ticker1MarketData) > 0:
-                flag += 1
+                
                 ticker1RecentMarketData = ticker1MarketData[-1]
                 '''更新价格1'''
                 self.midPrices[ticker1].append(
@@ -566,7 +570,7 @@ class InDevelopingStrategy(QuantStrategy):
                 self.stockdf.append(ticker1RecentMarketData.copy())
 
             if len(ticker2MarketData) > 0:
-                flag += 1
+                
                 ticker2RecentMarketData = ticker2MarketData[-1]
                 '''更新价格2'''
                 self.midPrices[ticker2].append(
@@ -619,17 +623,19 @@ class InDevelopingStrategy(QuantStrategy):
                                         
 
                 order = self.generate_signal_copula(df1, df2, 10, valid_min = 3, trust_prob=0.7, op_last=None, base='future')
-            
-                if order != 0:
+                if order == 0:
+                    return []
+                if order != self.lastorder:
+                    self.absoluteCash = self.initial_cash
+                self.lastorder = order
+                if order == 2:
                     print('order:----------------------------------------------------------------', order)
                 ordersizeStock, ordersizeFutures, direction_stock, direction_futures = 0, 0, 0, 0
                 if order == 1:
                     direction_stock, direction_futures = 1, -1
                 elif order == -1:
                     direction_stock, direction_futures = -1, 1
-                elif order == 0:
-                    return []
-                elif order == 2:
+                elif order == 2 and self.lastorder != 2:
                     '''强制平仓'''
                     stockPosition = self.position[ticker1][-1]
                     futurePosition = self.position[ticker2][-1]
@@ -637,52 +643,58 @@ class InDevelopingStrategy(QuantStrategy):
                     if stockPosition == 0 and futurePosition == 0:
                         return []
                     if stockPosition != 0:
+                        print(stockPosition)
                         ordersizeStock = abs(stockPosition)
                         direction_stock = -np.sign(stockPosition)
                     if futurePosition != 0:
+                        print(futurePosition)
                         ordersizeFutures = abs(futurePosition)
                         direction_futures = -np.sign(futurePosition)
-
-                if self.cash[-1] <= self.limit_cash and order != 2:
+                    self.absoluteCash = self.initial_cash
+                else:
+                    return []
+                if self.absoluteCash > self.limit_cash:
+                    cash_stock = self.initial_cash * self.cashCostRatio // 2
+                    cash_future = self.initial_cash * self.cashCostRatio // 2
+                else:
                     print('cash is not enough')
                     return []
-                else:
-                    cash_stock = self.cash[-1] * self.cashCostRatio // 2
-                    cash_future = self.cash[-1] * self.cashCostRatio // 2
                 
                 #######
-                if direction_stock > 0:
-                    if ordersizeStock == 0:
-                        ordersizeStock = cash_stock // stock_df.iloc[-1,]['askPrice1']
-                    odprice = stock_df.iloc[-1,]['askPrice1']
-                elif direction_stock < 0:
-                    if ordersizeStock == 0:
-                        ordersizeStock = cash_stock // stock_df.iloc[-1,]['bidPrice1']
+                if order != 2:
+                    if direction_stock > 0:
+                        if (self.lastorder == 0 or self.lastorder == 2) or order == self.lastorder:
+                            ordersizeStock = cash_stock // stock_df.iloc[-1,]['askPrice1']
+                        else:
+                            ordersizeStock = self.position[ticker1][-1] + cash_stock // stock_df.iloc[-1,]['askPrice1']
+                    # odprice = stock_df.iloc[-1,]['askPrice1']
+                    elif direction_stock < 0:
+                        if (self.lastorder == 0 or self.lastorder == 2) or order == self.lastorder:
+                            ordersizeStock = cash_stock // stock_df.iloc[-1,]['bidPrice1'] + cash_stock // stock_df.iloc[-1,]['askPrice1']
+                        else:
+                            ordersizeStock = self.position[ticker1][-1]
                         # print(stock_df.iloc[-1,]['bidPrice1'], ordersizeStock)
-                    odprice = stock_df.iloc[-1,]['bidPrice1']
-                else:
-                    ordersizeStock = 0
-                    odprice = 0
+                    # odprice = stock_df.iloc[-1,]['bidPrice1']
 
-                if direction_futures > 0:
-                    if ordersizeFutures == 0:
-                        ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['askPrice1']
-                        # print(future_dfQ.iloc[-1,]['askPrice1'],ordersizeFutures)
-                    odpriceF = future_dfQ.iloc[-1,]['askPrice1']
-                elif direction_futures < 0:
-                    if ordersizeFutures == 0:
-                        ordersizeFutures = cash_stock // future_dfQ.iloc[-1,]['bidPrice1']
-                    odpriceF = future_dfQ.iloc[-1,]['bidPrice1']
-                else:
-                    ordersizeFutures = 0
-                    odpriceF = 0
+                    if direction_futures > 0:
+                        if (self.lastorder == 0 or self.lastorder == 2) or order == self.lastorder:
+                            ordersizeFutures = cash_future // future_dfQ.iloc[-1,]['askPrice1']
+                        else:
+                            ordersizeFutures= self.position[ticker2][-1] + cash_future // future_dfQ.iloc[-1,]['askPrice1']
+                    # odprice = stock_df.iloc[-1,]['askPrice1']
+                    elif direction_futures < 0:
+                        if (self.lastorder == 0 or self.lastorder == 2) or order == self.lastorder:
+                            ordersizeFutures = cash_future// future_dfQ.iloc[-1,]['bidPrice1'] 
+                        else:
+                            ordersizeFutures = self.position[ticker2][-1] + cash_future // future_dfQ.iloc[-1,]['askPrice1']
                 #######
                 # if direction_stock != 0:
                 #     ordersizeStock = 1
                 # if direction_futures != 0:
                 #     ordersizeFutures = 1
-                print('ordersizeStock',ordersizeStock)
-                print('ordersizeFutures',ordersizeFutures)
+                if order != 0:
+                    print('ordersizeStock',ordersizeStock)
+                    print('ordersizeFutures',ordersizeFutures)
                 if ordersizeFutures == 0 and ordersizeStock == 0:
                     print(2)
                     return []
@@ -731,11 +743,12 @@ class InDevelopingStrategy(QuantStrategy):
             if order.currStatus == 'Filled':
                 self.untreated_order.remove(order.orderID)
                 ticker, tradesize, direction, tradeprice = execution.ticker, execution.size, execution.direction, execution.price
-                #print(ticker, tradesize, direction, tradeprice)
-                print(f'ticker:{ticker}, tradesize:{tradesize}, direction:{direction}, tradeprice:{tradeprice}')
+                if tradeprice==0:
+                    print(f'ticker:{ticker}, tradesize:{tradesize}, direction:{direction}, tradeprice:{tradeprice}')
                 self.position[ticker].append(self.position[ticker][-1] + tradesize * direction)
                 #self.pnl.append(self.pnl[-1] - tradesize * direction * tradeprice)
                 self.cash.append(self.cash[-1] - tradesize * direction * tradeprice)
+                self.absoluteCash -= tradesize * tradeprice
                 self.execution_record.append({
                     'timestamp': execution.timeStamp,
                     'ticker': ticker,
