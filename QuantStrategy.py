@@ -722,11 +722,12 @@ class InDevelopingStrategy(QuantStrategy):
             #######on receive execution
             print('execution!!!!!!')
             order = self.orderManager.lookupOrderID(execution.orderID)
-            print(order)
+            #print(order)
             if order.currStatus == 'Filled':
                 self.untreated_order.remove(order.orderID)
                 ticker, tradesize, direction, tradeprice = execution.ticker, execution.size, execution.direction, execution.price
-                print(ticker, tradesize, direction, tradeprice)
+                #print(ticker, tradesize, direction, tradeprice)
+                print(f'ticker:{ticker}, tradesize:{tradesize}, direction:{direction}, tradeprice:{tradeprice}')
                 self.position[ticker].append(self.position[ticker][-1] + tradesize * direction)
                 #self.pnl.append(self.pnl[-1] - tradesize * direction * tradeprice)
                 self.cash.append(self.cash[-1] - tradesize * direction * tradeprice)

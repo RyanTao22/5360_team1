@@ -105,7 +105,7 @@ def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSp
     processes = []
 
     '''调整采样频率'''
-    resampleFreq = '1T' # None, '1s','1T','1H','1D'
+    resampleFreq = '1T' # None, '1s','1T','5T','1H','1D'
     '''打开回测模式'''
     backTest = True
 
