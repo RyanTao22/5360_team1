@@ -139,7 +139,7 @@ def run_backtest(backtest_2_dash_q, startDate, endDate, startTime, stockCodes, f
 
 def back_test_analysis():
     app = dash.Dash(__name__)
-    backtest_2_dash_q = Queue()
+    #backtest_2_dash_q = Queue()
 
 
     app.layout = html.Div([

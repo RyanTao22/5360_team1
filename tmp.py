@@ -6,26 +6,19 @@ import random
 from datetime import datetime, timedelta
 import numpy as np
 import plotly.graph_objs as go
-from multiprocessing import Process, Queue, set_start_method
+from multiprocessing import Process, Queue
 from marketDataService import MarketDataService
 from futureDataService import FutureDataService
 from UnifiedDataService import UnifiedDataService
 from exchangeSimulator import ExchangeSimulator
 from quantTradingPlatform import TradingPlatform
-
 import time
 from marketDataServiceConfig import MarketDataServiceConfig
-
 import os
 import pandas as pd
-import time
-
-# Explicitly set the start method to 'spawn'
-# set_start_method('spawn', force=True)
 
 def calculate_indicators(net_worth_list, baseline_networth, initial_cash, timestamps, n_loops_a_day, annual_risk_free_rate=0.04):
     returns = np.diff(net_worth_list) / net_worth_list[:-1]
-    # Metrics Calculation
     strategy_return = (net_worth_list[-1] - initial_cash) / initial_cash
     annualized_return = ((1 + strategy_return) ** (252 / len(set([t.date() for t in timestamps]))) - 1)
     baseline_return = (baseline_networth[-1] - initial_cash) / initial_cash
@@ -33,11 +26,9 @@ def calculate_indicators(net_worth_list, baseline_networth, initial_cash, timest
     beta = np.cov(returns, np.diff(baseline_networth) / baseline_networth[:-1])[0, 1] / np.var(np.diff(baseline_networth) / baseline_networth[:-1])
     alpha = excess_return - beta * (baseline_return - annual_risk_free_rate / 252)
     sharpe_ratio = (np.mean(returns) - annual_risk_free_rate / 252) / np.std(returns) * np.sqrt(252 * n_loops_a_day)
-    
     highwatermark = np.maximum.accumulate(net_worth_list)
     drawdown = np.array(net_worth_list) / highwatermark - 1
     max_drawdown = np.min(drawdown)
-    
     sortino_ratio = (np.mean(returns) - annual_risk_free_rate / 252) / np.std([r for r in returns if r < 0]) * np.sqrt(252 * n_loops_a_day)
     average_daily_excess_return = np.mean(returns - (baseline_return / len(returns)))
     excess_return_drawdown = 1 - np.array(returns) / np.maximum.accumulate(returns)
@@ -46,12 +37,9 @@ def calculate_indicators(net_worth_list, baseline_networth, initial_cash, timest
     signal_ratio = (np.mean(returns) - annual_risk_free_rate / 252) / np.std(returns)
     strategy_volatility = np.std(returns) * np.sqrt(252 * n_loops_a_day)
     benchmark_volatility = np.std(np.diff(baseline_networth) / baseline_networth[:-1]) * np.sqrt(252 * n_loops_a_day)
-    
     start_idx = np.where(drawdown == max_drawdown)[0][0]
     end_idx = np.argmax(highwatermark[:start_idx])
-    
     max_drawdown_period = (timestamps[start_idx], timestamps[end_idx])
-
     results = {
         'strategy_return': strategy_return,
         'annualized_return': annualized_return,
@@ -72,45 +60,30 @@ def calculate_indicators(net_worth_list, baseline_networth, initial_cash, timest
     }
     return results
 
-
 def run_backtest(backtest_2_dash_q, startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest):
     marketData_2_exchSim_q = Queue()
     marketData_2_platform_q = Queue()
-
     futureData_2_exchSim_q = Queue()
     futureData_2_platform_q = Queue()
-    
     platform_2_exchSim_order_q = Queue()
     exchSim_2_platform_execution_q = Queue()
-
     platform_2_futuresExchSim_order_q = Queue()
     platform_2_strategy_md_q = Queue()
-
     strategy_2_platform_order_q = Queue()
     platform_2_strategy_execution_q = Queue()
     analysis_q = Queue()
-
     isReady = None
-
-    processes = []
-
-    '''调整采样频率'''
-    resampleFreq = '1T' # None, '1s','1T','5T','1H','1D'
-    '''打开回测模式'''
+    resampleFreq = '1T'
     backTest = True if backTest == 'True' else False
-
     fds = FutureDataService(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, resampleFreq, isReady)
     mds = MarketDataService(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, resampleFreq, isReady)
-    
     Process(name='uds', target=UnifiedDataService, args=(mds, fds)).start()
     Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)).start()
     Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)).start()
     Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, stockCodes, futuresCodes, initial_cash, analysis_q, isReady, debug)).start()
-
     net_worth_list = []
     timestamps = []
     baseline_networth = []
-
     while True:
         data = analysis_q.get()
         if 'signal' in data and data['signal'] == 'EndOfData':
@@ -120,14 +93,12 @@ def run_backtest(backtest_2_dash_q, startDate, endDate, startTime, stockCodes, f
         baseline_networth.append(initial_cash)
         baseline_networth[-1] = baseline_networth[-1] * (1 + 0.0001 * random.randint(-10, 10))
         backtest_2_dash_q.put((net_worth_list, timestamps, baseline_networth))
-
-    backtest_2_dash_q.put('Done')
-
+    backtest_2_dash_q.put(('Done', net_worth_list, timestamps, baseline_networth))
 
 def back_test_analysis():
     app = dash.Dash(__name__)
     backtest_2_dash_q = Queue()
-
+    final_results = None
     app.layout = html.Div([
         html.Div([
             html.Label('Start Date', style={'font-weight': 'bold', 'margin-right': '10px'}),
@@ -135,7 +106,7 @@ def back_test_analysis():
             html.Label('End Date', style={'font-weight': 'bold', 'margin-right': '10px'}),
             dcc.Input(id='end_date', value='20240628', type='text', style={'margin-right': '10px', 'width': '80px'}),
             html.Label('Start Time', style={'font-weight': 'bold', 'margin-right': '10px'}),
-            dcc.Input(id='start_time', value=91015869, type='number', style={'margin-right': '10px', 'width': '100px'}),
+            dcc.Input(id='start_time', value=121015869, type='number', style={'margin-right': '10px', 'width': '100px'}),
             html.Label('Initial Cash', style={'font-weight': 'bold', 'margin-right': '10px'}),
             dcc.Input(id='initial_cash', value=1000000, type='number', style={'margin-right': '10px', 'width': '100px'}),
             html.Label('Play Speed', style={'font-weight': 'bold', 'margin-right': '10px'}),
@@ -144,7 +115,6 @@ def back_test_analysis():
             dcc.Input(id='ticker1', value='2618', type='text', style={'margin-right': '10px', 'width': '60px'}),
             html.Label('ticker2', style={'font-weight': 'bold', 'margin-right': '10px'}),
             dcc.Input(id='ticker2', value='HSF1', type='text', style={'margin-right': '10px', 'width': '60px'}),
-            html.Label('BackTest', style={'font-weight': 'bold', 'margin-right': '10px'}),
             html.Div([
                 html.Label('BackTest', style={'font-weight': 'bold', 'margin-right': '10px'}),
                 dcc.RadioItems(
@@ -244,15 +214,18 @@ def back_test_analysis():
             Process(target=run_backtest, args=(backtest_2_dash_q, start_date, end_date, start_time, stockCodes, futuresCodes, play_speed, initial_cash, debug, backTest)).start()
             return False
         return True
-
+    
     @app.callback(
         Output('networth_graph', 'figure'),
         [Input('interval_component', 'n_intervals')]
     )
     def update_graph_live(n):
+        nonlocal final_results
+
         if not backtest_2_dash_q.empty():
             data = backtest_2_dash_q.get()
-            if data == 'Done':
+            if data[0] == 'Done':
+                final_results = data
                 return dash.no_update
 
             net_worth_list, timestamps, baseline_networth = data
@@ -285,7 +258,7 @@ def back_test_analysis():
             )
             return fig
         return dash.no_update
-
+    
     @app.callback(
         [
             Output('strategy_return', 'children'),
@@ -308,12 +281,15 @@ def back_test_analysis():
         [Input('interval_component', 'n_intervals')]
     )
     def update_indicators(n):
+        nonlocal final_results
+
         if not backtest_2_dash_q.empty():
             data = backtest_2_dash_q.get()
-            if data == 'Done':
-                net_worth_list, timestamps, baseline_networth = backtest_2_dash_q.get()
-                # timestamps = [ts[0] for ts in timestamps]
-                # net_worth_list = [nw[0] for nw in net_worth_list]
+            if data[0] == 'Done' or final_results is not None:
+                if final_results is not None:
+                    data = final_results
+                print('----------Updating indicators--------')
+                net_worth_list, timestamps, baseline_networth = data[1:]
                 results = calculate_indicators(net_worth_list, baseline_networth, net_worth_list[0], timestamps, n_loops_a_day=int(len(timestamps) / len(set([t.date() for t in timestamps]))))
 
                 def format_percentage(value):
@@ -345,8 +321,9 @@ def back_test_analysis():
                     format_percentage(results['benchmark_volatility']),
                     str(results['max_drawdown_period'][1].strftime('%Y%m%d %H:%M:%S%z')+';'+results['max_drawdown_period'][0].strftime('%Y%m%d %H:%M:%S%z'))
                 )
-        return ['--']*16
-    
+        
+        return dash.no_update
+
     app.run_server(debug=True)
 
 if __name__ == '__main__':
