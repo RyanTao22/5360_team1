@@ -105,7 +105,8 @@ def run_backtest(backtest_2_dash_q, startDate, endDate, startTime, stockCodes, f
     platform_2_strategy_execution_q = Queue()
     analysis_q = Queue()
     isReady = None
-    resampleFreq = '1T'
+    #resampleFreq = '1T'
+    resampleFreq = None
     backTest = True if backTest == 'True' else False
     fds = FutureDataService(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, resampleFreq, isReady)
     mds = MarketDataService(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, resampleFreq, isReady)

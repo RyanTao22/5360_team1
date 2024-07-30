@@ -99,7 +99,6 @@ class SampleDummyStrategy(QuantStrategy):
                 # judge if ticker1RecentTimestamp is the first row of this minute with help of self.timestamp. If so, append it to the list. If not, return []
                 ticker1RecentTimestamp = pd.to_datetime(ticker1RecentMarketData['date'] + time_delta)
                 ticker1RecentTimestamp = ticker1RecentTimestamp.iloc[0]
-                print(ticker1RecentTimestamp.floor('T'))
 
                 if  len(self.timestamp) == 0 or (ticker1RecentTimestamp.floor('T') > self.timestamp[-1].floor('T') and self.MDType[-1] != 'S'):
                     print('ticker1RecentTimestamp',ticker1RecentTimestamp)
@@ -278,6 +277,8 @@ class InDevelopingStrategy(QuantStrategy):
         # self.baseline_positions = {}
     
         self.MDType = ['None']
+        self.Sminute = []
+        self.Fminute = []
 
 
     def gain_timeindex(self, start_time, end_time):
@@ -558,9 +559,24 @@ class InDevelopingStrategy(QuantStrategy):
 
 
             if len(ticker1MarketData) > 0:
-                
+
                 ticker1RecentMarketData = ticker1MarketData[-1]
-                '''更新价格1'''
+                '''Update price of ticker1'''
+                time_delta =ticker1RecentMarketData['time'].apply(lambda x: pd.to_timedelta(f"{x.hour:02d}:{x.minute:02d}:{x.second:02d}.{x.microsecond:05d}"))
+
+                '''jump the data if is not the first data in this minute'''
+                # judge if ticker1RecentTimestamp is the first row of this minute with help of self.timestamp. If so, append it to the list. If not, return []
+                ticker1RecentTimestamp = pd.to_datetime(ticker1RecentMarketData['date'] + time_delta)
+                ticker1RecentTimestamp = ticker1RecentTimestamp.iloc[0]
+
+                if len(self.Sminute) == 0 or ticker1RecentTimestamp.floor('T') > self.Sminute[-1]:
+                    self.Sminute.append(ticker1RecentTimestamp.floor('T'))
+                    print('----------------------keeped-Stock---------------------',self.Sminute[-1])
+                else:
+                    return []
+                
+
+                '''Updata midPrice1'''
                 self.midPrices[ticker1].append(
                     (ticker1RecentMarketData['bidPrice1'] + ticker1RecentMarketData['askPrice1']) / 2)
                 # print('更新价格1',ticker1RecentMarketData['time'])
@@ -574,7 +590,21 @@ class InDevelopingStrategy(QuantStrategy):
             if len(ticker2MarketData) > 0:
                 
                 ticker2RecentMarketData = ticker2MarketData[-1]
-                '''更新价格2'''
+                
+                time_delta =ticker2RecentMarketData['time'].apply(lambda x: pd.to_timedelta(f"{x.hour:02d}:{x.minute:02d}:{x.second:02d}.{x.microsecond:05d}"))
+
+                '''jump the data if is not the first data in this minute'''
+                # judge if ticker2RecentTimestamp is the first row of this minute with help of self.timestamp. If so, append it to the list. If not, return []
+                ticker2RecentTimestamp = pd.to_datetime(ticker2RecentMarketData['date'] + time_delta)
+                ticker2RecentTimestamp = ticker2RecentTimestamp.iloc[0]
+
+                if len(self.Fminute) == 0 or ticker2RecentTimestamp.floor('T') > self.Fminute[-1]:
+                    self.Fminute.append(ticker2RecentTimestamp.floor('T'))
+                    print('----------------------keeped-Future---------------------',self.Fminute[-1])
+                else:
+                    return []
+                
+                '''Update price of ticker2'''
                 self.midPrices[ticker2].append(
                     (ticker2RecentMarketData['bidPrice1'] + ticker2RecentMarketData['askPrice1']) / 2)
                 # print('更新价格2',ticker2RecentMarketData['time'])

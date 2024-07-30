@@ -142,7 +142,7 @@ class TradingPlatform:
         while True:
             res:OrderBookSnapshot_FiveLevels = marketData_2_platform_q.get()
             # print('[%d] Platform.on_md' % (os.getpid()))
-            #print(res.outputAsDataFrame())
+            print(res.outputAsDataFrame())
 
             
             '''判断数据是否都更新完成'''
