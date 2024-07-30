@@ -51,7 +51,6 @@ class QuantStrategy(Strategy):
             return SingleStockOrder('testTicker','2019-07-05',time.asctime(time.localtime(time.time())))
         else:
             return None
-                
 
 class SampleDummyStrategy(QuantStrategy):
     def __init__(self, stratID, stratName, stratAuthor, day, ticker,
@@ -75,6 +74,7 @@ class SampleDummyStrategy(QuantStrategy):
         # self.baseline_positions = {}
     
         self.timestamp = []
+        self.MDType = ['None']
 
     def run(self,execution:SingleStockExecution)->list[SingleStockOrder]:
         ticker1 = self.ticker[0]
@@ -93,24 +93,47 @@ class SampleDummyStrategy(QuantStrategy):
             if len(ticker1MarketData) > 0:
 
                 ticker1RecentMarketData = ticker1MarketData[-1]
-                '''更新价格1'''
-                self.midPrices[ticker1].append((ticker1RecentMarketData['bidPrice1'] + ticker1RecentMarketData['askPrice1'])/2)
-                #print('更新价格1',ticker1RecentMarketData['time'])
-                #df['date'] + pd.to_timedelta(df['time'].astype(str))
-                self.timestamp.append(pd.to_datetime(ticker1RecentMarketData['date'])  + pd.to_timedelta(ticker1RecentMarketData['time'].astype(str)))
-                #self.timestamp.append(pd.to_datetime(ticker1RecentMarketData['date']  + ticker1RecentMarketData['time']))
+                '''Update price of ticker1'''
+                time_delta =ticker1RecentMarketData['time'].apply(lambda x: pd.to_timedelta(f"{x.hour:02d}:{x.minute:02d}:{x.second:02d}.{x.microsecond:05d}"))
+
+                # judge if ticker1RecentTimestamp is the first row of this minute with help of self.timestamp. If so, append it to the list. If not, return []
+                ticker1RecentTimestamp = pd.to_datetime(ticker1RecentMarketData['date'] + time_delta)
+                ticker1RecentTimestamp = ticker1RecentTimestamp.iloc[0]
+                print(ticker1RecentTimestamp.floor('T'))
+
+                if  len(self.timestamp) == 0 or (ticker1RecentTimestamp.floor('T') > self.timestamp[-1].floor('T') and self.MDType[-1] != 'S'):
+                    print('ticker1RecentTimestamp',ticker1RecentTimestamp)
+                    self.timestamp.append(ticker1RecentTimestamp)
+                    self.MDType.append('S')
+                    self.midPrices[ticker1].append(
+                        (ticker1RecentMarketData['bidPrice1'] + ticker1RecentMarketData['askPrice1']) / 2)
+                    self.stockdf.append(ticker1RecentMarketData.copy())
+                else:
+                    return []
+                          
 
             if len(ticker2MarketData) > 0:
                 ticker2RecentMarketData = ticker2MarketData[-1]
-                '''更新价格2'''
-                self.midPrices[ticker2].append((ticker2RecentMarketData['bidPrice1'] + ticker2RecentMarketData['askPrice1'])/2)
-                #print('更新价格2',ticker2RecentMarketData['time'])
-                #self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'].to_string + ' ' + ticker2RecentMarketData['time']))
-                # unsupported operand type(s) for +: 'DatetimeArray' and 'str'
-                self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'])  + pd.to_timedelta(ticker2RecentMarketData['time'].astype(str)))
-                #self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'] + ticker2RecentMarketData['time']))
+                
+                '''Update price of ticker2'''
 
-            '''使用更新后的价格计算净值'''
+                time_delta =ticker2RecentMarketData['time'].apply(lambda x: pd.to_timedelta(f"{x.hour:02d}:{x.minute:02d}:{x.second:02d}.{x.microsecond:05d}"))
+                
+                # judge if ticker2RecentTimestamp is the first row of this minute with help of self.timestamp. If so, append it to the list. If not, return []
+                ticker2RecentTimestamp = pd.to_datetime(ticker2RecentMarketData['date'] + time_delta)
+                ticker2RecentTimestamp = ticker2RecentTimestamp.iloc[0]
+                
+                if  len(self.timestamp) == 0 or (ticker2RecentTimestamp.floor('T') > self.timestamp[-1].floor('T') and self.MDType[-1] != 'FQ'):
+                    print('ticker2RecentTimestamp',ticker2RecentTimestamp)
+                    self.timestamp.append(ticker2RecentTimestamp)
+                    self.MDType.append('FQ')
+                    self.midPrices[ticker2].append(
+                        (ticker2RecentMarketData['bidPrice1'] + ticker2RecentMarketData['askPrice1']) / 2)
+                    self.futuredfQ.append(ticker2RecentMarketData.copy())
+                else:
+                    return []
+
+            '''Calculate net worth with updated prices'''
             netWrorth = self.cash[-1]
             if len(self.positions[ticker1]) > 0:
                 netWrorth += self.positions[ticker1][-1] * self.midPrices[ticker1][-1]
@@ -118,7 +141,7 @@ class SampleDummyStrategy(QuantStrategy):
                 netWrorth += self.positions[ticker2][-1] * self.midPrices[ticker2][-1]
 
             #print(self.timestamp[-1],self.cash[-1],netWrorth)
-            '''记录到共享队列analysis_q中'''
+            '''record to shared queue analysis_q'''
             # update analysis: timestamp, networth, cash
             self.analysis_q.put({
                 'timestamp':  self.timestamp[-1],
@@ -177,7 +200,7 @@ class SampleDummyStrategy(QuantStrategy):
             print(order)
 
 
-            '''记录持仓'''
+            '''record holding positions'''
             if execution.price is None and execution.size is None: return [] ######CANCEL order will produce an execution with None price and None size
             ticker, tradesize, direction, tradeprice = execution.ticker, execution.size, execution.direction,execution.price
             self.execution_record.append({
@@ -187,7 +210,7 @@ class SampleDummyStrategy(QuantStrategy):
                 'direction': direction,
                 'price': tradeprice
             })
-            '''更新仓位现金'''
+            '''update cash and positions'''
             self.positions[ticker].append(self.positions[ticker][-1] + tradesize * direction)
             self.cash.append(self.cash[-1] - tradesize * direction * tradeprice)
 
@@ -237,9 +260,9 @@ class InDevelopingStrategy(QuantStrategy):
         self.stockdf = [pd.DataFrame()]
         self.futuredfQ = [pd.DataFrame()]
         # self.futuredfT = [pd.DataFrame()]
-        '''记录所有发出的订单'''
+        '''record all orders submitted'''
         self.submitted_order = [] #(ordertime, orderid, orderprice, ordersize, direction)
-        '''记录未成交或者成交后有残余的订单'''
+        '''record orders that are cancelled or partially filled'''
         self.untreated_order = [] #(ordertime, orderid, orderprice, ordersize, direction)
 
         self.analysis_q = analysis_queue
@@ -254,7 +277,7 @@ class InDevelopingStrategy(QuantStrategy):
         # self.baseline_networth = initial_cash
         # self.baseline_positions = {}
     
-        self.timestamp = []
+        self.MDType = ['None']
 
 
     def gain_timeindex(self, start_time, end_time):
@@ -334,6 +357,10 @@ class InDevelopingStrategy(QuantStrategy):
            n:需要回看的数据长度
             tickers:获取对应标的的数据（tickers可以是单只股票（期货），也可以是一堆，这里也可以考虑每次只取一个ticker的后面再合成
             返回 数据表（如果长度小于n（则要么返回现有长度，要么由于存在回看，小于说明数据量不够，无法回看，直接返回空'''
+        '''Get Data from the Transmission of Project3
+           n: The length of data to be reviewed
+            tickers: Get the corresponding data of the target (tickers can be a single stock (future), or a bunch, here you can also consider taking one ticker at a time and then combining it later
+            Return the data table (if the length is less than n (then return the current length, or because there is a review, less than it means that the data is insufficient, cannot be reviewed, and return empty directly'''
         
         processedDataStock = self.stock_dataprocess(stockdf)
         processedDataFuture = self.future_dataprocess(futuredfQ)
@@ -572,8 +599,7 @@ class InDevelopingStrategy(QuantStrategy):
             if len(self.positions[ticker2]) > 0:
                 netWrorth += self.positions[ticker2][-1] * self.midPrices[ticker2][-1]
 
-            # print(self.timestamp[-1],self.cash[-1],netWrorth)
-            '''记录到共享队列analysis_q中'''
+            '''record to shared queue analysis_q'''
             # update analysis: timestamp, networth, cash
             self.analysis_q.put({
                 'timestamp': self.timestamp[-1],

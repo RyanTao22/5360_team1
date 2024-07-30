@@ -70,7 +70,7 @@ class TradingPlatform:
         self.futuresCodes = futuresCodes
         #####init strat
         strat = InDevelopingStrategy(
-            stratID="dummy1",stratName="dummy1",stratAuthor="hongsongchou",day="20230706",
+            stratID="coupula1",stratName="couplua1",stratAuthor="proj4",day="20260628",
             ticker=[self.stockCodes[0],self.futuresCodes[0]],tickers2Snapshots=self.tickers2Snapshots,
             orderManager=self.orderManager,
             initial_cash=initial_cash,analysis_queue=analysis_q            

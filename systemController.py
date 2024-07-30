@@ -25,7 +25,7 @@ import pandas as pd
 import time
 
 # Explicitly set the start method to 'spawn'
-#set_start_method('spawn', force=True)
+# set_start_method('spawn', force=True)
 
 def calculate_indicators(net_worth_list, baseline_networth, initial_cash, timestamps, n_loops_a_day,annual_risk_free_rate=0.04):
     returns = np.diff(net_worth_list) / net_worth_list[:-1]
@@ -77,7 +77,7 @@ def calculate_indicators(net_worth_list, baseline_networth, initial_cash, timest
     return results
 
 
-def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest):
+def run_backtest(backtest_2_dash_q, startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest):
     
     # stockCodes = MarketDataServiceConfig.stockCodes
     # futuresCodes = MarketDataServiceConfig.futuresCodes
@@ -107,47 +107,18 @@ def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSp
     '''调整采样频率'''
     resampleFreq = '1T' # None, '1s','1T','5T','1H','1D'
     '''打开回测模式'''
-    backTest = True
+    backTest = True if backTest == 'True' else False
 
-    # startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest,resampleFreq = ('2024-06-28',
-    #                                                                                                          '2024-06-28',
-    #                                                                                                          122015869,
-    #                                                                                                         # 132315869,
-    #                                                                                                          ['2618'],
-    #                                                                                                          ['HSF1'],
-    #                                                                                                          10000000,
-    #                                                                                                          1000000,
-    #                                                                                                          False,
-    #                                                                                                          True,
-    #                                                                                                          '1T')# None, '1s','1T','1H','1D'
+    
     fds = FutureDataService(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest,resampleFreq, isReady)
     mds = MarketDataService(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest,resampleFreq, isReady)
     
     Process(name='uds', target=UnifiedDataService, args=(mds,fds)).start()
-    # Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)).start()
+    
     Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)).start()
     Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)).start()
 
     Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, stockCodes, futuresCodes, initial_cash, analysis_q, isReady, debug)).start()
-
-    # # try:
-    # if futuresCodes == []:
-    #     processes.append(Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, isReady)))
-    #     processes.append(Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)))
-    # elif stockCodes == []:
-    #     processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
-    #     processes.append(Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)))
-    # else:
-    #     processes.append(Process(name='md', target=MarketDataService, args=(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, isReady)))
-    #     processes.append(Process(name='futured', target=FutureDataService, args=(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, isReady)))
-    #     processes.append(Process(name='stockExchange', target=ExchangeSimulator, args=(marketData_2_exchSim_q, platform_2_exchSim_order_q, exchSim_2_platform_execution_q, stockCodes, isReady, debug)))
-    #     processes.append(Process(name='futureExchange', target=ExchangeSimulator, args=(futureData_2_exchSim_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, futuresCodes, isReady, debug)))
-
-    # processes.append(Process(name='platform', target=TradingPlatform, args=(marketData_2_platform_q, platform_2_exchSim_order_q, platform_2_futuresExchSim_order_q, exchSim_2_platform_execution_q, stockCodes, futuresCodes, initial_cash, analysis_q, isReady, debug)))
-    
-    # for p in processes:
-    #     p.start()
-    #     #time.sleep(1)  # Ensure processes start in sequence to avoid race conditions
 
     net_worth_list = []
     timestamps = []
@@ -155,6 +126,7 @@ def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSp
 
     while True:
         data = analysis_q.get()
+        print(data)
         if 'signal' in data and data['signal'] == 'EndOfData':
             break
         net_worth_list.append(data['networth'])
@@ -162,50 +134,45 @@ def run_backtest(startDate, endDate, startTime, stockCodes, futuresCodes, playSp
         #baseline_networth.append(data['baseline_networth'])
         baseline_networth.append(initial_cash)
         baseline_networth[-1] = baseline_networth[-1] * (1 + 0.0001 * random.randint(-10, 10))
-    # finally:
-    #     for p in processes:
-    #         print(p.name,'terminate')
-    #         p.terminate()
+        backtest_2_dash_q.put((net_worth_list, timestamps, baseline_networth))
 
-    return net_worth_list, timestamps, baseline_networth
 
 def back_test_analysis():
     app = dash.Dash(__name__)
+    backtest_2_dash_q = Queue()
+
 
     app.layout = html.Div([
-        html.Div([
-            html.Label('Start Date', style={'font-weight': 'bold', 'margin-bottom': '10px'}),
-            dcc.Input(id='start_date', value='20240628', type='text', style={'margin-bottom': '10px'}),
-            html.Label('End Date', style={'font-weight': 'bold'}),
-            dcc.Input(id='end_date', value='20240628', type='text', style={'margin-bottom': '10px'}),
-            html.Label('Start Time', style={'font-weight': 'bold'}),
-            # should be int
-            # dcc.Input(id='start_time', value=123015869, type='number', style={'margin-bottom': '10px'}),
-            dcc.Input(id='start_time', value=90000000, type='number', style={'margin-bottom': '10px'}),
-            html.Label('Initial Cash', style={'font-weight': 'bold'}),
-            dcc.Input(id='initial_cash', value=1000000, type='number', style={'margin-bottom': '10px'}),
-            html.Label('Play Speed', style={'font-weight': 'bold'}),
-            dcc.Input(id='play_speed', value=1000000, type='number', style={'margin-bottom': '10px'}),
-            html.Label('ticker1', style={'font-weight': 'bold'}),
-            dcc.Input(id='ticker1', value='2618', type='text', style={'margin-bottom': '10px'}),
-            html.Label('ticker2', style={'font-weight': 'bold'}),
-            dcc.Input(id='ticker2', value='HSF1', type='text', style={'margin-bottom': '10px'}),
-            html.Button('Run Backtest', id='run_backtest', n_clicks=0, style={'background-color': '#4CAF50', 'color': 'white', 'padding': '10px', 'border': 'none', 'cursor': 'pointer', 'font-weight': 'bold', 'float': 'right'}),
-
-            # todo: BackTest按钮
-            # dcc.Checklist('Back Test', id='back_test', value=True, style={'margin-bottom': '10px'}),
-            # dcc.RadioItems(
-            #     id='back_test',
-            #     options=[
-            #         {'label': 'Yes', 'value': True}, 
-            #         {'label': 'No', 'value': False},
-            #     ],
-            #     value=True,
-            #     style={'margin-bottom': '10px'},
-            #     inline=True
-            # ),
-            
-        ], style={'margin-bottom': '20px', 'background-color': '#f2f2f2'}),
+            html.Div([
+            html.Label('Start Date', style={'font-weight': 'bold', 'margin-right': '10px'}),
+            dcc.Input(id='start_date', value='20240628', type='text', style={'margin-right': '10px', 'width': '80px'}),
+            html.Label('End Date', style={'font-weight': 'bold', 'margin-right': '10px'}),
+            dcc.Input(id='end_date', value='20240628', type='text', style={'margin-right': '10px', 'width': '80px'}),
+            html.Label('Start Time', style={'font-weight': 'bold', 'margin-right': '10px'}),
+            dcc.Input(id='start_time', value=91015869, type='number', style={'margin-right': '10px', 'width': '100px'}),
+            html.Label('Initial Cash', style={'font-weight': 'bold', 'margin-right': '10px'}),
+            dcc.Input(id='initial_cash', value=1000000, type='number', style={'margin-right': '10px', 'width': '100px'}),
+            html.Label('Play Speed', style={'font-weight': 'bold', 'margin-right': '10px'}),
+            dcc.Input(id='play_speed', value=1, type='number', style={'margin-right': '10px', 'width': '60px'}),
+            html.Label('ticker1', style={'font-weight': 'bold', 'margin-right': '10px'}),
+            dcc.Input(id='ticker1', value='2618', type='text', style={'margin-right': '10px', 'width': '60px'}),
+            html.Label('ticker2', style={'font-weight': 'bold', 'margin-right': '10px'}),
+            dcc.Input(id='ticker2', value='HSF1', type='text', style={'margin-right': '10px', 'width': '60px'}),
+            html.Label('BackTest', style={'font-weight': 'bold', 'margin-right': '10px'}),
+            html.Div([
+                html.Label('BackTest', style={'font-weight': 'bold', 'margin-right': '10px'}),
+                dcc.RadioItems(
+                    id='backTest',
+                    options=[
+                        {'label': 'BackTest', 'value': 'True'},
+                        {'label': 'RePlay', 'value': 'False'}
+                    ],
+                    value='True',
+                    labelStyle={'display': 'inline-block', 'margin-right': '10px'}
+                ),
+                html.Button('Run Backtest', id='run_backtest', n_clicks=0, style={'background-color': '#4CAF50', 'color': 'white', 'padding': '5px 10px', 'border': 'none', 'cursor': 'pointer', 'font-weight': 'bold'})
+            ], style={'margin-left': 'auto', 'display': 'flex', 'align-items': 'center'}),
+        ], style={'display': 'flex', 'flex-wrap': 'wrap', 'align-items': 'center'}),
         html.Div([
             html.Table([
                 html.Tr([
@@ -286,9 +253,10 @@ def back_test_analysis():
             State('play_speed', 'value'),
             State('ticker1', 'value'),
             State('ticker2', 'value'),
+            State('backTest', 'value')
         ]
     )
-    def update_backtest(n_clicks, start_date,  end_date, start_time, initial_cash, play_speed,ticker1,ticker2):
+    def update_backtest(n_clicks, start_date,  end_date, start_time, initial_cash, play_speed,ticker1,ticker2,backTest):
         if n_clicks == 0:
             return ['--']*16 + [{}]
 
@@ -305,17 +273,15 @@ def back_test_analysis():
         if ticker2 in stock_codes_full: stockCodes.append(ticker2)
         else: futuresCodes.append(ticker2)
 
-        '''此处设置为很大，以缩短使得到结果。可根据需求改小'''
-        # start_time = 132315869
-        # play_speed = 1000
+        
         debug = False
-        backTest = True
+        # backTest = True
         
 
-        net_worth_list, timestamps, baseline_networth = run_backtest(start_date, end_date, start_time, stockCodes, futuresCodes, play_speed, initial_cash, debug, backTest)
+        run_backtest(start_date, end_date, start_time, stockCodes, futuresCodes, play_speed, initial_cash, debug, backTest)
         
         #pd.DataFrame({'timestamp':timestamps,'net_worth':net_worth_list}).to_csv('net_worth.csv',index=False)
-        print(net_worth_list)
+        # print(net_worth_list)
         # print(baseline_networth)
         # print(timestamps)
 

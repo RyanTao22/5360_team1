@@ -61,7 +61,7 @@ class MarketDataService:
     def resampleData(self,resampleFreq):
         if resampleFreq != None:
             self.cData.index = self.cData.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
-            self.cData = self.cData.resample(resampleFreq).last()
+            self.cData = self.cData.resample(resampleFreq).first()
             self.cData.dropna(inplace=True)
             self.cData.reset_index(drop = True,inplace=True)
 
@@ -161,7 +161,7 @@ class MarketDataService:
 
         if resampleFreq != None:
             self.cData.index = self.cData.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
-            self.cData = self.cData.resample(resampleFreq).last()
+            self.cData = self.cData.resample(resampleFreq).first()
             self.cData.dropna(inplace=True)
             self.cData.reset_index(drop = True,inplace=True)
 
@@ -196,7 +196,7 @@ class MarketDataService:
             quoteSnapshot.volume = row.get("volume")
             quoteSnapshot.lastPx = row.get("lastPx")
                         
-            if not self.backTest: time.sleep(diff)
+            #if not self.backTest: time.sleep(diff)
             marketData_2_exchSim_q.put(quoteSnapshot)
             marketData_2_platform_q.put(quoteSnapshot)
         '''添加一个EndOfData的信号'''
