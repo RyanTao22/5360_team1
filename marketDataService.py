@@ -48,7 +48,6 @@ class MarketDataService:
         print("[%d]<<<<< call MarketDataService.calculateTimestampDiff" % (os.getpid(),))
         self.calculateTimestampDiff()
 
-        print("[%d]<<<<< call MarketDataService.resampleData" % (os.getpid(),))
         self.resampleData(resampleFreq)
 
         # if isReady is not None:
@@ -59,10 +58,12 @@ class MarketDataService:
         # self.produce_quote(marketData_2_exchSim_q, marketData_2_platform_q)
 
     def resampleData(self,resampleFreq):
+        
         if resampleFreq != None:
+            print("[%d]<<<<< call MarketDataService.resampleData" % (os.getpid(),))
             self.cData.index = self.cData.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
             self.cData = self.cData.resample(resampleFreq).first()
-            self.cData.dropna(inplace=True)
+            #self.cData.dropna(inplace=True)
             self.cData.reset_index(drop = True,inplace=True)
 
 

@@ -70,7 +70,6 @@ class FutureDataService:
         print("[%d]<<<<< call FutureDataService.calculateTimestampDiff" % (os.getpid(),))
         self.calculateTimestampDiff()
 
-        print("[%d]<<<<< call FutureDataService.resampleData" % (os.getpid(),))
         self.resampleData(resampleFreq)
 
 
@@ -97,9 +96,10 @@ class FutureDataService:
 
     def resampleData(self,resampleFreq):
         if resampleFreq != None:
+            print("[%d]<<<<< call FutureDataService.resampleData" % (os.getpid(),))
             self.tqcData.index = self.tqcData.apply(lambda row: datetime.datetime.strptime(row['date']+ ' ' + str(row['time']).zfill(8), '%Y-%m-%d %H%M%S%f'), axis=1)
             self.tqcData = self.tqcData.resample(resampleFreq).first()
-            self.tqcData.dropna(inplace=True)
+            #self.tqcData.dropna(inplace=True)
             self.tqcData.reset_index(drop = True,inplace=True)
     
     def unzipFile(self):

@@ -13,9 +13,10 @@ class UnifiedDataService:
 
         def produce_data(self):
             self.fullData = pd.concat([
+                self.fds.tqcData,
                 self.mds.cData.assign(type="both"),
-                self.fds.tqcData
             ]).sort_values(['date','time'])
+            #self.fullData.to_csv('see.csv')
             ts_diff = pd.to_datetime(self.fullData['time'], format='%H%M%S%f') - pd.to_datetime(self.fullData['time'].shift(1),format='%H%M%S%f')
             self.fullData['ts_diff'] = ts_diff.dt.total_seconds() * 1000
             self.fullData['ts_diff'] = self.fullData['ts_diff'].fillna(0)

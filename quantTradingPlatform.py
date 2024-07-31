@@ -110,13 +110,22 @@ class TradingPlatform:
     def isStock(self,ticker ): return ticker in self.stockCodes_full
     def isFutures(self,ticker ): return ticker in self.futuresCodes_full
     def updateTickers2Snapshots(self,snap: OrderBookSnapshot_FiveLevels):
+        # Updated design: pass a whole dataframe to the strategy
+        # if self.isStock(snap.ticker):
+        #     self.tickers2Snapshots['stocks'][snap.ticker].append(snap.outputAsDataFrame())
+        # elif self.isFutures(snap.ticker) and snap.type == "quotes" :
+        #     self.tickers2Snapshots['futures_quotes'][snap.ticker].append(snap.outputAsDataFrame())
+        # elif self.isFutures(snap.ticker) and snap.type == "trades" :
+        #     self.tickers2Snapshots['futures_trades'][snap.ticker].append(snap.outputAsDataFrame())
+
+        # Current design
         if self.isStock(snap.ticker):
-            self.tickers2Snapshots['stocks'][snap.ticker].append(snap.outputAsDataFrame())
+            self.tickers2Snapshots['stocks'][snap.ticker] = [snap.outputAsDataFrame()]
         elif self.isFutures(snap.ticker) and snap.type == "quotes" :
-            self.tickers2Snapshots['futures_quotes'][snap.ticker].append(snap.outputAsDataFrame())
+            self.tickers2Snapshots['futures_quotes'][snap.ticker]= [snap.outputAsDataFrame()]
         elif self.isFutures(snap.ticker) and snap.type == "trades" :
-            self.tickers2Snapshots['futures_trades'][snap.ticker].append(snap.outputAsDataFrame())
-        self.checkTickers2Snapshots()
+            self.tickers2Snapshots['futures_trades'][snap.ticker]= [snap.outputAsDataFrame()]
+        #self.checkTickers2Snapshots()
 
     def checkTickers2Snapshots(self):
         logMsg = """
@@ -142,7 +151,9 @@ class TradingPlatform:
         while True:
             res:OrderBookSnapshot_FiveLevels = marketData_2_platform_q.get()
             # print('[%d] Platform.on_md' % (os.getpid()))
-            print(res.outputAsDataFrame())
+            
+            '''查看Platform收到的数据'''
+            #print(res.outputAsDataFrame())
 
             
             '''判断数据是否都更新完成'''
@@ -180,7 +191,7 @@ class TradingPlatform:
         while True:
             obj = exchSim_2_platform_execution_q.get()
             if isinstance(obj,SingleStockOrder):
-                print('get order')
+                #print('get order')
                 order = self.orderManager.lookupOrderID(obj.orderID)
                 if obj.currStatus == "Rejected":
                     order.currStatus = "Rejected"

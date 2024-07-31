@@ -93,6 +93,7 @@ def calculate_indicators(net_worth_list, baseline_networth, initial_cash, timest
     return results
 
 def run_backtest(backtest_2_dash_q, startDate, endDate, startTime, stockCodes, futuresCodes, playSpeed, initial_cash, debug, backTest):
+    '''Function to start the processes of the system'''
     marketData_2_exchSim_q = Queue()
     marketData_2_platform_q = Queue()
     futureData_2_exchSim_q = Queue()
@@ -105,9 +106,12 @@ def run_backtest(backtest_2_dash_q, startDate, endDate, startTime, stockCodes, f
     platform_2_strategy_execution_q = Queue()
     analysis_q = Queue()
     isReady = None
-    #resampleFreq = '1T'
-    resampleFreq = None
+    resampleFreq = '1T'
+    #resampleFreq = None
+
     backTest = True if backTest == 'True' else False
+    if backTest == False: resampleFreq = None
+
     fds = FutureDataService(futureData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, futuresCodes, playSpeed, backTest, resampleFreq, isReady)
     mds = MarketDataService(marketData_2_exchSim_q, marketData_2_platform_q, startDate, endDate, startTime, stockCodes, playSpeed, backTest, resampleFreq, isReady)
     Process(name='uds', target=UnifiedDataService, args=(mds, fds)).start()
@@ -117,6 +121,8 @@ def run_backtest(backtest_2_dash_q, startDate, endDate, startTime, stockCodes, f
     net_worth_list = []
     timestamps = []
     baseline_networth = []
+
+    '''Receive analysis data from the queue and send it to the dashboard'''
     while True:
         data = analysis_q.get()
         if 'signal' in data and data['signal'] == 'EndOfData':
@@ -130,6 +136,7 @@ def run_backtest(backtest_2_dash_q, startDate, endDate, startTime, stockCodes, f
         backtest_2_dash_q.put((net_worth_list, timestamps, baseline_networth))
     
 def back_test_analysis():
+    '''Function to build and start the dashboard'''
     app = dash.Dash(__name__)
     backtest_2_dash_q = Queue()
 
@@ -140,7 +147,7 @@ def back_test_analysis():
             html.Label('End Date', style={'font-weight': 'bold', 'margin-right': '10px'}),
             dcc.Input(id='end_date', value='20240628', type='text', style={'margin-right': '10px', 'width': '80px'}),
             html.Label('Start Time', style={'font-weight': 'bold', 'margin-right': '10px'}),
-            dcc.Input(id='start_time', value=121015869, type='number', style={'margin-right': '10px', 'width': '100px'}),
+            dcc.Input(id='start_time', value=121000000, type='number', style={'margin-right': '10px', 'width': '100px'}),
             html.Label('Initial Cash', style={'font-weight': 'bold', 'margin-right': '10px'}),
             dcc.Input(id='initial_cash', value=1000000, type='number', style={'margin-right': '10px', 'width': '100px'}),
             html.Label('Play Speed', style={'font-weight': 'bold', 'margin-right': '10px'}),

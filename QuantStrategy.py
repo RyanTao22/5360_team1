@@ -53,6 +53,7 @@ class QuantStrategy(Strategy):
             return None
 
 class SampleDummyStrategy(QuantStrategy):
+    '''A sample dummy strategy for test that does nothing but print out the market data and execution'''
     def __init__(self, stratID, stratName, stratAuthor, day, ticker,
                  tickers2Snapshots: Mapping[str,OrderBookSnapshot_FiveLevels],
                  orderManager:OrderManager, initial_cash, analysis_queue):
@@ -93,7 +94,6 @@ class SampleDummyStrategy(QuantStrategy):
             if len(ticker1MarketData) > 0:
 
                 ticker1RecentMarketData = ticker1MarketData[-1]
-                '''Update price of ticker1'''
                 time_delta =ticker1RecentMarketData['time'].apply(lambda x: pd.to_timedelta(f"{x.hour:02d}:{x.minute:02d}:{x.second:02d}.{x.microsecond:05d}"))
 
                 '''jump the data if is not the first data in this minute'''
@@ -187,7 +187,6 @@ class SampleDummyStrategy(QuantStrategy):
         else:
             #######on receive execution
             order = self.orderManager.lookupOrderID(execution.orderID)
-            #print('execution!!!!!!')
             print(order)
 
 
@@ -239,7 +238,7 @@ class InDevelopingStrategy(QuantStrategy):
         self.cashCostRatio = 0.05
         self.networth = [0]
         self.pnl = [0]
-        self.position = {ticker[0]:[0], ticker[1]: [0]} #这个应该是一个{}的形状
+        self.position = {ticker[0]:[0], ticker[1]: [0]}
         self.ret = []
         self.current_idx = 0
         self.tickers = ticker
@@ -269,8 +268,8 @@ class InDevelopingStrategy(QuantStrategy):
         # self.baseline_positions = {}
     
         self.MDType = ['None']
-        self.Sminute = []
-        self.Fminute = []
+        self.Sminute = [] #record each minute's first timestamp's date,hour,minute for stock
+        self.Fminute = [] #record each minute's first timestamp's date,hour,minute for future_quotes
 
 
     def gain_timeindex(self, start_time, end_time):
@@ -534,6 +533,17 @@ class InDevelopingStrategy(QuantStrategy):
 
 
     def run(self, execution: SingleStockExecution) -> list[SingleStockOrder]:
+        '''Function to run the strategy
+        Parameters 
+        ----------
+        execution: SingleStockExecution
+            Execution data
+            If no Exection data received, that means there is a update in Stock Quotes&Price data, Future Quotes data or Future Trades data.
+        
+        Returns
+        ----------
+        list of SingleStockOrder(This class supports both stock and future order)
+        '''
         ticker1 = self.ticker[0]
         ticker2 = self.ticker[1]
         flag = 0
@@ -549,10 +559,15 @@ class InDevelopingStrategy(QuantStrategy):
             ticker2RecentMarketData = None
             ticker2RecentMarketData_trades = None
 
+            # print('ticker1MarketData',len(ticker1MarketData))
+            # print('ticker2MarketData',len(ticker2MarketData))
+
 
             if len(ticker1MarketData) > 0:
 
                 ticker1RecentMarketData = ticker1MarketData[-1]
+                self.tickers2Snapshots['stocks'][ticker1] = []
+                #print(ticker1RecentMarketData)
                 '''Update price of ticker1'''
                 time_delta =ticker1RecentMarketData['time'].apply(lambda x: pd.to_timedelta(f"{x.hour:02d}:{x.minute:02d}:{x.second:02d}.{x.microsecond:05d}"))
 
@@ -560,10 +575,11 @@ class InDevelopingStrategy(QuantStrategy):
                 # judge if ticker1RecentTimestamp is the first row of this minute with help of self.timestamp. If so, append it to the list. If not, return []
                 ticker1RecentTimestamp = pd.to_datetime(ticker1RecentMarketData['date'] + time_delta)
                 ticker1RecentTimestamp = ticker1RecentTimestamp.iloc[0]
-
                 if len(self.Sminute) == 0 or ticker1RecentTimestamp.floor('T') > self.Sminute[-1]:
                     self.Sminute.append(ticker1RecentTimestamp.floor('T'))
                     print('----------------------keeped-Stock---------------------',self.Sminute[-1])
+                    #ticker1RecentMarketData.to_csv('time_bt.csv', mode='a', header=False)
+                    #ticker1RecentMarketData.to_csv('time_replay.csv', mode='a', header=False)
                 else:
                     return []
                 
@@ -571,17 +587,17 @@ class InDevelopingStrategy(QuantStrategy):
                 '''Updata midPrice1'''
                 self.midPrices[ticker1].append(
                     (ticker1RecentMarketData['bidPrice1'] + ticker1RecentMarketData['askPrice1']) / 2)
-                # print('更新价格1',ticker1RecentMarketData['time'])
-                # df['date'] + pd.to_timedelta(df['time'].astype(str))
+                '''Record midPrice's corresponding Timestamp'''
                 self.timestamp.append(pd.to_datetime(ticker1RecentMarketData['date']) + pd.to_timedelta(
                     ticker1RecentMarketData['time'].astype(str)))
-                # self.timestamp.append(pd.to_datetime(ticker1RecentMarketData['date']  + ticker1RecentMarketData['time']))
-                # 将新信息存储到历史表列表中
+                '''Record newly received data to memory'''
                 self.stockdf.append(ticker1RecentMarketData.copy())
 
             if len(ticker2MarketData) > 0:
                 
                 ticker2RecentMarketData = ticker2MarketData[-1]
+                self.tickers2Snapshots['futures_quotes'][ticker2] = []
+                #print(ticker2RecentMarketData)
                 
                 time_delta =ticker2RecentMarketData['time'].apply(lambda x: pd.to_timedelta(f"{x.hour:02d}:{x.minute:02d}:{x.second:02d}.{x.microsecond:05d}"))
 
@@ -593,27 +609,20 @@ class InDevelopingStrategy(QuantStrategy):
                 if len(self.Fminute) == 0 or ticker2RecentTimestamp.floor('T') > self.Fminute[-1]:
                     self.Fminute.append(ticker2RecentTimestamp.floor('T'))
                     print('----------------------keeped-Future---------------------',self.Fminute[-1])
+                    #ticker2RecentMarketData.to_csv('time_bt.csv', mode='a', header=False)
+                    #ticker2RecentMarketData.to_csv('time_replay.csv', mode='a', header=False)
                 else:
                     return []
                 
                 '''Update price of ticker2'''
                 self.midPrices[ticker2].append(
                     (ticker2RecentMarketData['bidPrice1'] + ticker2RecentMarketData['askPrice1']) / 2)
-                # print('更新价格2',ticker2RecentMarketData['time'])
-                # self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'].to_string + ' ' + ticker2RecentMarketData['time']))
-                # unsupported operand type(s) for +: 'DatetimeArray' and 'str'
+                '''Record midPrice's corresponding Timestamp'''
                 self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date']) + pd.to_timedelta(
                     ticker2RecentMarketData['time'].astype(str)))
-                # self.timestamp.append(pd.to_datetime(ticker2RecentMarketData['date'] + ticker2RecentMarketData['time']))
+                '''Record newly received data to memory'''
                 self.futuredfQ.append(ticker2RecentMarketData.copy())
 
-            # if len(ticker2MarketData_trades) > 0:
-            #     flag += 1
-            #     ticker2RecentMarketData = ticker2MarketData_trades[-1]
-            #     # 更新trade表
-            #     self.futuredfT.append(ticker2RecentMarketData.copy())
-                
-            # print(len(self.stockdf), len(self.futuredfQ), len(self.futuredfT))
            
             netWrorth = self.cash[-1]
             if len(self.positions[ticker1]) > 0:
@@ -760,7 +769,7 @@ class InDevelopingStrategy(QuantStrategy):
                 return [sampleOrder1, sampleOrder2]
         else:
             #######on receive execution
-            print('execution!!!!!!')
+            print('[%d]Received Execution'% (os.getpid(),))
             order = self.orderManager.lookupOrderID(execution.orderID)
             #print(order)
             if order.currStatus == 'Filled':
